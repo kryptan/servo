@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde::{Deserializer, Serializer};
-use std::sync::mpsc;
+use std::sync::mpsc::{self, Sender, Receiver};
 
 #[macro_use]
 macro_rules! unreachable_serializable {
@@ -25,8 +25,8 @@ macro_rules! unreachable_serializable {
 }
 
 #[derive(Clone)]
-pub struct WebGLSender<T>(mpsc::Sender<T>);
-pub struct WebGLReceiver<T>(mpsc::Receiver<T>);
+pub struct WebGLSender<T>(Sender<T>);
+pub struct WebGLReceiver<T>(Receiver<T>);
 
 impl<T> WebGLSender<T> {
     #[inline]

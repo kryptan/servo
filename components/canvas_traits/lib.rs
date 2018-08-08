@@ -4,6 +4,7 @@
 
 #![crate_name = "canvas_traits"]
 #![crate_type = "rlib"]
+#![feature(nonzero)]
 
 #![deny(unsafe_code)]
 
