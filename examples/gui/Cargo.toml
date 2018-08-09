@@ -1,0 +1,9 @@
+[package]
+name = "gui_example"
+version = "0.0.1"
+authors = ["The Servo Project Developers"]
+license = "MPL-2.0"
+publish = false
+
+[dependencies]
+servo_gui = {path = "../../ports/libservo_gui"}

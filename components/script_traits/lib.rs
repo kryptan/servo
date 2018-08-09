@@ -35,6 +35,7 @@ extern crate style_traits;
 extern crate time;
 extern crate webrender_api;
 extern crate webvr_traits;
+extern crate mime;
 
 mod script_msg;
 pub mod webdriver_msg;
@@ -49,6 +50,7 @@ use hyper::method::Method;
 use ipc_channel::{Error as IpcError};
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use libc::c_void;
+use mime::Mime;
 use msg::constellation_msg::{BrowsingContextId, HistoryStateId, Key, KeyModifiers, KeyState, PipelineId};
 use msg::constellation_msg::{PipelineNamespaceId, TraversalDirection, TopLevelBrowsingContextId};
 use net_traits::{FetchResponseMsg, ReferrerPolicy, ResourceThreads};
@@ -559,6 +561,24 @@ pub struct InitialScriptState {
     pub webvr_chan: Option<IpcSender<WebVRMsg>>,
     /// The Webrender document ID associated with this thread.
     pub webrender_document: DocumentId,
+    /// Application which uses Servo as a GUI library.
+    pub gui_application: Option<Box<GuiApplication>>,
+}
+
+/// Trait implemented by the application that uses Servo as a GUI library.
+pub trait GuiApplication: Send {
+    /// Get resource from the application.
+    fn get_resource(&mut self, uri: &str) -> Option<GuiApplicationResponse>;
+    /// Handle event. Name is the handler method specified in XHTML.
+    fn handle_event(&mut self, name: &str, event: ());
+}
+
+/// Resource provided by the application.
+pub struct GuiApplicationResponse {
+    /// Content-type of the resource.
+    pub content_type: Mime,
+    /// Entire resource data.
+    pub data: Vec<u8>,
 }
 
 /// This trait allows creating a `ScriptThread` without depending on the `script`

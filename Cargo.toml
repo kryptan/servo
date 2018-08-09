@@ -2,11 +2,15 @@
 members = [
     "ports/servo",
     "ports/libsimpleservo/",
+    "ports/libservo_gui",
+    "examples/gui",
     "tests/unit/*",
 ]
 default-members = [
     "ports/servo",
     "ports/libsimpleservo/",
+    "ports/libservo_gui",
+    "examples/gui",
     "tests/unit/*",
 ]
 exclude = [".cargo"]

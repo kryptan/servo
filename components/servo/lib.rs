@@ -109,6 +109,7 @@ pub use gleam::gl;
 pub use servo_config as config;
 pub use servo_url as url;
 pub use msg::constellation_msg::{KeyState, TopLevelBrowsingContextId as BrowserId};
+pub use script_traits::{GuiApplication, GuiApplicationResponse};
 
 /// The in-process interface to Servo.
 ///
@@ -129,7 +130,7 @@ pub struct Servo<Window: WindowMethods + 'static> {
 }
 
 impl<Window> Servo<Window> where Window: WindowMethods + 'static {
-    pub fn new(window: Rc<Window>) -> Servo<Window> {
+    pub fn new(window: Rc<Window>, gui_application: Option<Box<GuiApplication>>) -> Servo<Window> {
         // Global configuration options, parsed from the command line.
         let opts = opts::get();
 
@@ -217,7 +218,8 @@ impl<Window> Servo<Window> where Window: WindowMethods + 'static {
                                                                     &mut webrender,
                                                                     webrender_document,
                                                                     webrender_api_sender,
-                                                                    window.gl());
+                                                                    window.gl(),
+                                                                    gui_application);
 
         // Send the constellation's swmanager sender to service worker manager thread
         script::init_service_workers(sw_senders);
@@ -462,7 +464,8 @@ fn create_constellation(user_agent: Cow<'static, str>,
                         webrender: &mut webrender::Renderer,
                         webrender_document: webrender_api::DocumentId,
                         webrender_api_sender: webrender_api::RenderApiSender,
-                        window_gl: Rc<gl::Gl>)
+                        window_gl: Rc<gl::Gl>,
+                        gui_application: Option<Box<GuiApplication>>)
                         -> (Sender<ConstellationMsg>, SWManagerSenders) {
     let bluetooth_thread: IpcSender<BluetoothRequest> = BluetoothThreadFactory::new(embedder_proxy.clone());
 
@@ -532,6 +535,7 @@ fn create_constellation(user_agent: Cow<'static, str>,
         webrender_api_sender,
         webgl_threads,
         webvr_chan,
+        gui_application,
     };
     let (constellation_chan, from_swmanager_sender) =
         Constellation::<script_layout_interface::message::Msg,

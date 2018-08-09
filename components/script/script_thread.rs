@@ -79,7 +79,7 @@ use metrics::{MAX_TASK_NS, PaintTimeMetrics};
 use microtask::{MicrotaskQueue, Microtask};
 use msg::constellation_msg::{BrowsingContextId, HistoryStateId, PipelineId};
 use msg::constellation_msg::{PipelineNamespace, TopLevelBrowsingContextId};
-use net_traits::{FetchMetadata, FetchResponseListener, FetchResponseMsg};
+use net_traits::{FetchMetadata, FetchResponseListener, FetchResponseMsg, FilteredMetadata};
 use net_traits::{Metadata, NetworkError, ReferrerPolicy, ResourceThreads};
 use net_traits::image_cache::{ImageCache, PendingImageResponse};
 use net_traits::request::{CredentialsMode, Destination, RedirectMode, RequestInit};
@@ -97,6 +97,7 @@ use script_traits::{ProgressiveWebMetricType, Painter, ScriptMsg, ScriptThreadFa
 use script_traits::{ScriptToConstellationChan, TimerEvent, TimerSchedulerMsg};
 use script_traits::{TimerSource, TouchEventType, TouchId, UntrustedNodeAddress};
 use script_traits::{UpdatePipelineIdReason, WindowSizeData, WindowSizeType};
+use script_traits::GuiApplication;
 use script_traits::CompositorEvent::{KeyEvent, MouseButtonEvent, MouseMoveEvent, ResizeEvent, TouchEvent};
 use script_traits::webdriver_msg::WebDriverScriptCommand;
 use serviceworkerjob::{Job, JobQueue};
@@ -129,6 +130,7 @@ use url::percent_encoding::percent_decode;
 use webdriver_handlers;
 use webrender_api::DocumentId;
 use webvr_traits::{WebVREvent, WebVRMsg};
+use net_traits::response::HttpsState;
 
 pub type ImageCacheMsg = (PipelineId, PendingImageResponse);
 
@@ -242,6 +244,8 @@ pub enum MainThreadScriptMsg {
     },
     /// Dispatches a job queue.
     DispatchJobQueue { scope_url: ServoUrl },
+    /// Sends the resource from the application.
+    NavigationResponse(PipelineId, FetchResponseMsg),
 }
 
 impl OpaqueSender<CommonScriptMsg> for Box<ScriptChan + Send> {
@@ -520,6 +524,9 @@ pub struct ScriptThread {
 
     /// The Webrender Document ID associated with this thread.
     webrender_document: DocumentId,
+
+    /// Application which uses Servo as a GUI library.
+    gui_application: RefCell<Box<GuiApplication>>,
 }
 
 /// In the event of thread panic, all data on the stack runs its destructor. However, there
@@ -923,6 +930,8 @@ impl ScriptThread {
             custom_element_reaction_stack: CustomElementReactionStack::new(),
 
             webrender_document: state.webrender_document,
+
+            gui_application: RefCell::new(state.gui_application.unwrap()),
         }
     }
 
@@ -1233,6 +1242,7 @@ impl ScriptThread {
                     MainThreadScriptMsg::WorkletLoaded(pipeline_id) => Some(pipeline_id),
                     MainThreadScriptMsg::RegisterPaintWorklet { pipeline_id, .. } => Some(pipeline_id),
                     MainThreadScriptMsg::DispatchJobQueue { .. }  => None,
+                    MainThreadScriptMsg::NavigationResponse(pipeline_id, ..) => Some(pipeline_id),
                 }
             },
             MixedMessage::FromImageCache((pipeline_id, _)) => Some(pipeline_id),
@@ -1302,14 +1312,8 @@ impl ScriptThread {
 
     fn handle_msg_from_constellation(&self, msg: ConstellationControlMsg) {
         match msg {
-            ConstellationControlMsg::NavigationResponse(id, fetch_data) => {
-                match fetch_data {
-                    FetchResponseMsg::ProcessResponse(metadata) => self.handle_fetch_metadata(id, metadata),
-                    FetchResponseMsg::ProcessResponseChunk(chunk) => self.handle_fetch_chunk(id, chunk),
-                    FetchResponseMsg::ProcessResponseEOF(eof) => self.handle_fetch_eof(id, eof),
-                    _ => unreachable!(),
-                };
-            },
+            ConstellationControlMsg::NavigationResponse(id, fetch_data) =>
+                self.handle_fetch_msg(id, fetch_data),
             ConstellationControlMsg::Navigate(parent_pipeline_id, browsing_context_id, load_data, replace) =>
                 self.handle_navigate(parent_pipeline_id, Some(browsing_context_id), load_data, replace),
             ConstellationControlMsg::UnloadDocument(pipeline_id) =>
@@ -1376,6 +1380,9 @@ impl ScriptThread {
 
     fn handle_msg_from_script(&self, msg: MainThreadScriptMsg) {
         match msg {
+            MainThreadScriptMsg::NavigationResponse(id, fetch_data) => {
+                self.handle_fetch_msg(id, fetch_data)
+            },
             MainThreadScriptMsg::Navigate(parent_pipeline_id, load_data, replace) => {
                 self.handle_navigate(parent_pipeline_id, None, load_data, replace)
             },
@@ -2551,29 +2558,106 @@ impl ScriptThread {
     /// argument until a notification is received that the fetch is complete.
     fn pre_page_load(&self, mut incomplete: InProgressLoad, load_data: LoadData) {
         let id = incomplete.pipeline_id.clone();
-        let req_init = RequestInit {
-            url: load_data.url.clone(),
-            method: load_data.method,
-            destination: Destination::Document,
-            credentials_mode: CredentialsMode::Include,
-            use_url_credentials: true,
-            pipeline_id: Some(id),
-            referrer_url: load_data.referrer_url,
-            referrer_policy: load_data.referrer_policy,
-            headers: load_data.headers,
-            body: load_data.data,
-            redirect_mode: RedirectMode::Manual,
-            origin: incomplete.origin.immutable().clone(),
-            .. RequestInit::default()
-        };
-
-        let context = ParserContext::new(id, load_data.url);
+        let context = ParserContext::new(id, load_data.url.clone());
         self.incomplete_parser_contexts.borrow_mut().push((id, context));
 
         let cancel_chan = incomplete.canceller.initialize();
-
-        self.script_sender.send((id, ScriptMsg::InitiateNavigateRequest(req_init, cancel_chan))).unwrap();
+        
+        if load_data.url.scheme() == "app" {
+            for response in self.load_app_resource(&load_data.url).into_iter() {
+                self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, response)).unwrap();
+            }
+        } else {
+            let req_init = RequestInit {
+                url: load_data.url,
+                method: load_data.method,
+                destination: Destination::Document,
+                credentials_mode: CredentialsMode::Include,
+                use_url_credentials: true,
+                pipeline_id: Some(id),
+                referrer_url: load_data.referrer_url,
+                referrer_policy: load_data.referrer_policy,
+                headers: load_data.headers,
+                body: load_data.data,
+                redirect_mode: RedirectMode::Manual,
+                origin: incomplete.origin.immutable().clone(),
+                ..RequestInit::default()
+            };
+            self.script_sender.send((id, ScriptMsg::InitiateNavigateRequest(req_init, cancel_chan))).unwrap();
+        }
         self.incomplete_loads.borrow_mut().push(incomplete);
+    }
+
+    pub fn load_app_resource_static(url: &ServoUrl) -> Vec<FetchResponseMsg> {
+        SCRIPT_THREAD_ROOT.with(|root| {
+            let script_thread = unsafe { &*root.get().unwrap() };
+            script_thread.load_app_resource(url)
+        })
+    }
+
+    fn load_app_resource(&self, url: &ServoUrl) -> Vec<FetchResponseMsg> {
+        if url.scheme() != "app" {
+            let error = NetworkError::Internal("Scheme should be app".to_owned());
+            vec![FetchResponseMsg::ProcessResponse(Err(error))]
+        } else {
+            let SCHEME_LEN: usize = 4; // "app:"
+            let url_string = &url.as_str()[SCHEME_LEN..];
+            if let Some(response) = self.gui_application.borrow_mut().get_resource(url_string) {
+                let metadata = Metadata {
+                    final_url: url.clone(),
+                    location_url: None,
+                    content_type: Some(Serde(ContentType(response.content_type))),
+                    charset: None,
+                    headers: None,
+                    status: Some((200, Vec::new())),
+                    https_state: HttpsState::Modern,
+                    referrer: None,
+                    referrer_policy: None,
+                };
+
+                let metadata = FetchMetadata::Filtered {
+                    filtered: FilteredMetadata::Basic(metadata.clone()),
+                    unsafe_: metadata,
+                };
+
+                vec![
+                    FetchResponseMsg::ProcessResponse(Ok(metadata)),
+                    FetchResponseMsg::ProcessResponseChunk(response.data),
+                    FetchResponseMsg::ProcessResponseEOF(Ok(())),
+                ]
+            } else {
+                let metadata = Metadata {
+                    final_url: url.clone(),
+                    location_url: None,
+                    content_type: None,
+                    charset: None,
+                    headers: None,
+                    status: Some((404, Vec::new())),
+                    https_state: HttpsState::Modern,
+                    referrer: None,
+                    referrer_policy: None,
+                };
+
+                let metadata = FetchMetadata::Filtered {
+                    filtered: FilteredMetadata::Basic(metadata.clone()),
+                    unsafe_: metadata,
+                };
+
+                vec![
+                    FetchResponseMsg::ProcessResponse(Ok(metadata)),
+                    FetchResponseMsg::ProcessResponseEOF(Ok(())),
+                ]
+            }
+        }
+    }
+
+    fn handle_fetch_msg(&self, id: PipelineId, fetch_data: FetchResponseMsg) {
+        match fetch_data {
+            FetchResponseMsg::ProcessResponse(metadata) => self.handle_fetch_metadata(id, metadata),
+            FetchResponseMsg::ProcessResponseChunk(chunk) => self.handle_fetch_chunk(id, chunk),
+            FetchResponseMsg::ProcessResponseEOF(eof) => self.handle_fetch_eof(id, eof),
+            _ => unreachable!(),
+        };
     }
 
     fn handle_fetch_metadata(&self, id: PipelineId, fetch_metadata: Result<FetchMetadata, NetworkError>) {

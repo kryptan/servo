@@ -15,6 +15,7 @@ use net_traits::{ResourceThreads, IpcSend};
 use net_traits::request::RequestInit;
 use servo_url::ServoUrl;
 use std::thread;
+use script_thread::ScriptThread;
 
 #[derive(Clone, Debug, JSTraceable, MallocSizeOf, PartialEq)]
 pub enum LoadType {
@@ -135,11 +136,17 @@ impl DocumentLoader {
     pub fn fetch_async_background(&mut self,
                                   request: RequestInit,
                                   fetch_target: IpcSender<FetchResponseMsg>) {
-        let mut canceller = FetchCanceller::new();
-        let cancel_receiver = canceller.initialize();
-        self.cancellers.push(canceller);
-        self.resource_threads.sender().send(
-            CoreResourceMsg::Fetch(request, FetchChannels::ResponseMsg(fetch_target, Some(cancel_receiver)))).unwrap();
+        if request.url.scheme() == "app" {
+            for response in ScriptThread::load_app_resource_static(&request.url).into_iter() {
+                fetch_target.send(response).unwrap();
+            }
+        } else {
+            let mut canceller = FetchCanceller::new();
+            let cancel_receiver = canceller.initialize();
+            self.cancellers.push(canceller);
+            self.resource_threads.sender().send(
+                CoreResourceMsg::Fetch(request, FetchChannels::ResponseMsg(fetch_target, Some(cancel_receiver)))).unwrap();
+        }
     }
 
     /// Mark an in-progress network request complete.

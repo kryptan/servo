@@ -86,6 +86,7 @@ use script_layout_interface::rpc::LayoutRPC;
 use script_traits::{DocumentActivity, ScriptToConstellationChan, TimerEventId, TimerSource};
 use script_traits::{UntrustedNodeAddress, WindowSizeData, WindowSizeType};
 use script_traits::DrawAPaintImageResult;
+use script_traits::GuiApplication;
 use selectors::matching::ElementSelectorFlags;
 use serde::{Deserialize, Serialize};
 use servo_arc::Arc as ServoArc;
@@ -932,4 +933,11 @@ pub unsafe fn trace_traceables(tracer: *mut JSTracer) {
         let traceables = traceables.borrow();
         traceables.trace(tracer);
     });
+}
+
+unsafe impl JSTraceable for RefCell<Box<GuiApplication>> {
+    #[inline]
+    unsafe fn trace(&self, _: *mut JSTracer) {
+        // Do nothing
+    }
 }

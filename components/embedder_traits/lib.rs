@@ -88,7 +88,7 @@ pub enum EmbedderMsg {
     AllowOpeningBrowser(IpcSender<bool>),
     /// A new browser was created by script
     BrowserCreated(TopLevelBrowsingContextId),
-    /// Wether or not to unload a document
+    /// Whether or not to unload a document
     AllowUnload(IpcSender<bool>),
     /// Sends an unconsumed key event back to the embedder.
     KeyEvent(Option<char>, Key, KeyState, KeyModifiers),

@@ -139,7 +139,7 @@ pub fn init(
         waker,
     });
 
-    let servo = Servo::new(callbacks.clone());
+    let servo = Servo::new(callbacks.clone(), None);
 
     SERVO.with(|s| {
         let mut servo_glue = ServoGlue {

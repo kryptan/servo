@@ -131,6 +131,7 @@ use script_traits::{LayoutMsg as FromLayoutMsg, ScriptMsg as FromScriptMsg, Scri
 use script_traits::{LogEntry, ScriptToConstellationChan, ServiceWorkerMsg, webdriver_msg};
 use script_traits::{SWManagerMsg, ScopeThings, UpdatePipelineIdReason, WebDriverCommandMsg};
 use script_traits::{WindowSizeData, WindowSizeType};
+use script_traits::GuiApplication;
 use serde::{Deserialize, Serialize};
 use servo_config::opts;
 use servo_config::prefs::PREFS;
@@ -329,6 +330,9 @@ pub struct Constellation<Message, LTF, STF> {
 
     /// A channel through which messages can be sent to the canvas paint thread.
     canvas_chan: IpcSender<CanvasMsg>,
+
+    /// Application which uses Servo as a GUI library.
+    gui_application: Option<Box<GuiApplication>>,
 }
 
 /// State needed to construct a constellation.
@@ -378,6 +382,9 @@ pub struct InitialConstellationState {
     /// Whether the constellation supports the clipboard.
     /// TODO: this field is not used, remove it?
     pub supports_clipboard: bool,
+
+    /// Application which uses Servo as a GUI library.
+    pub gui_application: Option<Box<GuiApplication>>,
 }
 
 /// Data needed for webdriver
@@ -653,6 +660,7 @@ where
                     webgl_threads: state.webgl_threads,
                     webvr_chan: state.webvr_chan,
                     canvas_chan: CanvasPaintThread::start(),
+                    gui_application: state.gui_application,
                 };
 
                 constellation.run();
@@ -697,6 +705,7 @@ where
         load_data: LoadData,
         sandbox: IFrameSandboxState,
         is_private: bool,
+        gui_application: Option<Box<GuiApplication>>,
     ) {
         if self.shutting_down {
             return;
@@ -790,6 +799,7 @@ where
                 .as_ref()
                 .map(|threads| threads.pipeline()),
             webvr_chan: self.webvr_chan.clone(),
+            gui_application,
         });
 
         let pipeline = match result {
@@ -1588,6 +1598,7 @@ where
             load_data.clone(),
             sandbox,
             false,
+            None,
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id: top_level_browsing_context_id,
@@ -1668,6 +1679,7 @@ where
         }
         self.joint_session_histories
             .insert(top_level_browsing_context_id, JointSessionHistory::new());
+        let gui_application = self.gui_application.take();
         self.new_pipeline(
             pipeline_id,
             browsing_context_id,
@@ -1678,6 +1690,7 @@ where
             load_data.clone(),
             sandbox,
             false,
+            gui_application,
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id: top_level_browsing_context_id,
@@ -1812,6 +1825,7 @@ where
             load_data.clone(),
             load_info.sandbox,
             is_private,
+            None,
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id: load_info.info.top_level_browsing_context_id,
@@ -2087,6 +2101,7 @@ where
                     load_data.clone(),
                     sandbox,
                     false,
+                    None,
                 );
                 self.add_pending_change(SessionHistoryChange {
                     top_level_browsing_context_id: top_level_id,
@@ -2399,6 +2414,7 @@ where
                     load_data.clone(),
                     sandbox,
                     is_private,
+                    None,
                 );
                 self.add_pending_change(SessionHistoryChange {
                     top_level_browsing_context_id: top_level_id,

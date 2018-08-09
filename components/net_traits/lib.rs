@@ -148,7 +148,7 @@ impl<'a> From<&'a ReferrerPolicyHeader> for ReferrerPolicy {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum FetchResponseMsg {
     // todo: should have fields for transmitted/total bytes
     ProcessRequestBody,
@@ -184,7 +184,7 @@ pub trait FetchTaskTarget {
     fn process_response_eof(&mut self, response: &Response);
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub enum FilteredMetadata {
     Basic(Metadata),
     Cors(Metadata),
@@ -192,7 +192,7 @@ pub enum FilteredMetadata {
     OpaqueRedirect
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub enum FetchMetadata {
     Unfiltered(Metadata),
     Filtered {
@@ -401,7 +401,7 @@ pub struct ResourceCorsData {
 }
 
 /// Metadata about a loaded resource, such as is obtained from HTTP headers.
-#[derive(Clone, Deserialize, MallocSizeOf, Serialize)]
+#[derive(Clone, Deserialize, MallocSizeOf, Serialize, Debug)]
 pub struct Metadata {
     /// Final URL after redirects.
     pub final_url: ServoUrl,
