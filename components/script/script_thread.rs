@@ -2503,15 +2503,23 @@ impl ScriptThread {
 
         let _cancel_chan = incomplete.canceller.initialize();
 
-        if load_data.url.scheme() != "app" {
+        for response in self.load_resource(&load_data.url).into_iter() {
+            self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, response)).unwrap();
+        }
+
+        self.incomplete_loads.borrow_mut().push(incomplete);
+    }
+
+    fn load_resource(&self, url: &ServoUrl) -> Vec<FetchResponseMsg> {
+        if url.scheme() != "app" {
             let error = NetworkError::Internal("Scheme should be app".to_owned());
-            self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, FetchResponseMsg::ProcessResponse(Err(error)))).unwrap();
+            vec![FetchResponseMsg::ProcessResponse(Err(error))]
         } else {
             let SCHEME_LEN: usize = 4; // "app:"
-            let url = &load_data.url.as_str()[SCHEME_LEN..];
-            if let Some(response) = self.gui_application.borrow_mut().get_resource(url) {
+            let url_string = &url.as_str()[SCHEME_LEN..];
+            if let Some(response) = self.gui_application.borrow_mut().get_resource(url_string) {
                 let metadata = Metadata {
-                    final_url: load_data.url.clone(),
+                    final_url: url.clone(),
                     location_url: None,
                     content_type: Some(Serde(ContentType(response.content_type))),
                     charset: None,
@@ -2527,12 +2535,14 @@ impl ScriptThread {
                     unsafe_: metadata,
                 };
 
-                self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, FetchResponseMsg::ProcessResponse(Ok(metadata)))).unwrap();
-                self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, FetchResponseMsg::ProcessResponseChunk(response.data))).unwrap();
-                self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, FetchResponseMsg::ProcessResponseEOF(Ok(())))).unwrap();
+                vec![
+                    FetchResponseMsg::ProcessResponse(Ok(metadata)),
+                    FetchResponseMsg::ProcessResponseChunk(response.data),
+                    FetchResponseMsg::ProcessResponseEOF(Ok(())),
+                ]
             } else {
                 let metadata = Metadata {
-                    final_url: load_data.url.clone(),
+                    final_url: url.clone(),
                     location_url: None,
                     content_type: None,
                     charset: None,
@@ -2548,12 +2558,12 @@ impl ScriptThread {
                     unsafe_: metadata,
                 };
 
-                self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, FetchResponseMsg::ProcessResponse(Ok(metadata)))).unwrap();
-                self.chan.0.send(MainThreadScriptMsg::NavigationResponse(id, FetchResponseMsg::ProcessResponseEOF(Ok(())))).unwrap();
+                vec![
+                    FetchResponseMsg::ProcessResponse(Ok(metadata)),
+                    FetchResponseMsg::ProcessResponseEOF(Ok(())),
+                ]
             }
         }
-
-        self.incomplete_loads.borrow_mut().push(incomplete);
     }
 
     fn handle_fetch_metadata(&self, id: PipelineId, fetch_metadata: Result<FetchMetadata, NetworkError>) {
