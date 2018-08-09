@@ -133,7 +133,7 @@ pub fn init(
         waker,
     });
 
-    let mut servo = Servo::new(callbacks.clone());
+    let mut servo = Servo::new(callbacks.clone(), None);
 
     let (sender, receiver) = ipc::channel().map_err(|_| "Can't create ipc::channel")?;
     servo.handle_events(vec![WindowEvent::NewBrowser(url.clone(), sender)]);

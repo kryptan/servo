@@ -28,6 +28,7 @@ use script_traits::{DocumentActivity, InitialScriptState};
 use script_traits::{LayoutControlMsg, LayoutMsg, LoadData};
 use script_traits::{NewLayoutInfo, SWManagerMsg, SWManagerSenders};
 use script_traits::{ScriptThreadFactory, TimerSchedulerMsg, WindowSizeData};
+use script_traits::GuiApplication;
 use servo_config::opts::{self, Opts};
 use servo_config::prefs::{PREFS, Pref};
 use servo_url::ServoUrl;
@@ -184,6 +185,9 @@ pub struct InitialPipelineState {
 
     /// A channel to the webvr thread.
     pub webvr_chan: Option<IpcSender<WebVRMsg>>,
+
+    /// Application which uses Servo as a GUI library.
+    pub gui_application: Option<Box<GuiApplication>>,
 }
 
 impl Pipeline {
@@ -292,6 +296,7 @@ impl Pipeline {
                     webrender_document: state.webrender_document,
                     webgl_chan: state.webgl_chan,
                     webvr_chan: state.webvr_chan,
+                    gui_application: state.gui_application,
                 };
 
                 // Spawn the child process.
@@ -495,6 +500,8 @@ pub struct UnprivilegedPipelineContent {
     webrender_document: webrender_api::DocumentId,
     webgl_chan: Option<WebGLPipeline>,
     webvr_chan: Option<IpcSender<WebVRMsg>>,
+    #[serde(skip)] // always used in the same process
+    gui_application: Option<Box<GuiApplication>>,
 }
 
 impl UnprivilegedPipelineContent {
@@ -534,6 +541,7 @@ impl UnprivilegedPipelineContent {
                 webgl_chan: self.webgl_chan,
                 webvr_chan: self.webvr_chan,
                 webrender_document: self.webrender_document,
+                gui_application: self.gui_application,
             },
             self.load_data.clone(),
         );
