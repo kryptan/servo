@@ -296,22 +296,6 @@ macro_rules! unsafe_no_jsmanaged_fields(
     );
 );
 
-macro_rules! jsmanaged_array(
-    ($count:expr) => (
-        #[allow(unsafe_code)]
-        unsafe impl<T> $crate::dom::bindings::trace::JSTraceable for [T; $count]
-            where T: $crate::dom::bindings::trace::JSTraceable
-        {
-            #[inline]
-            unsafe fn trace(&self, tracer: *mut ::js::jsapi::JSTracer) {
-                for v in self.iter() {
-                    v.trace(tracer);
-                }
-            }
-        }
-    );
-);
-
 /// These are used to generate a event handler which has no special case.
 macro_rules! define_event_handler(
     ($handler: ty, $event_type: ident, $getter: ident, $setter: ident, $setter_fn: ident) => (
@@ -614,19 +598,3 @@ macro_rules! impl_performance_entry_struct(
         }
     );
 );
-
-macro_rules! handle_potential_webgl_error {
-    ($context:expr, $call:expr, $return_on_error:expr) => {
-        match $call {
-            Ok(ret) => ret,
-            Err(error) => {
-                $context.webgl_error(error);
-                $return_on_error
-            }
-        }
-    };
-    ($context:expr, $call:expr) => {
-        handle_potential_webgl_error!($context, $call, ());
-    };
-}
-

@@ -4,27 +4,21 @@
 
 use devtools_traits::{DevtoolScriptControlMsg, WorkerId};
 use dom::bindings::codegen::Bindings::FunctionBinding::Function;
-use dom::bindings::codegen::Bindings::RequestBinding::RequestInit;
 use dom::bindings::codegen::Bindings::WorkerGlobalScopeBinding::WorkerGlobalScopeMethods;
-use dom::bindings::codegen::UnionTypes::RequestOrUSVString;
 use dom::bindings::error::{Error, ErrorResult, Fallible, report_pending_exception};
 use dom::bindings::inheritance::Castable;
 use dom::bindings::reflector::DomObject;
 use dom::bindings::root::{DomRoot, MutNullableDom};
 use dom::bindings::settings_stack::AutoEntryScript;
 use dom::bindings::str::{DOMString, USVString};
-use dom::bindings::trace::RootedTraceableBox;
-use dom::crypto::Crypto;
 use dom::dedicatedworkerglobalscope::DedicatedWorkerGlobalScope;
 use dom::globalscope::GlobalScope;
 use dom::performance::Performance;
-use dom::promise::Promise;
 use dom::serviceworkerglobalscope::ServiceWorkerGlobalScope;
 use dom::window::{base64_atob, base64_btoa};
 use dom::workerlocation::WorkerLocation;
 use dom::workernavigator::WorkerNavigator;
 use dom_struct::dom_struct;
-use fetch;
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::{JSAutoCompartment, JSContext, JSRuntime};
 use js::jsval::UndefinedValue;
@@ -245,11 +239,6 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
         self.navigator.or_init(|| WorkerNavigator::new(self))
     }
 
-    // https://html.spec.whatwg.org/multipage/#dfn-Crypto
-    fn Crypto(&self) -> DomRoot<Crypto> {
-        self.upcast::<GlobalScope>().crypto()
-    }
-
     // https://html.spec.whatwg.org/multipage/#dom-windowbase64-btoa
     fn Btoa(&self, btoa: DOMString) -> Fallible<DOMString> {
         base64_btoa(btoa)
@@ -314,12 +303,6 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
         self.ClearTimeout(handle);
     }
 
-    #[allow(unrooted_must_root)]
-    // https://fetch.spec.whatwg.org/#fetch-method
-    fn Fetch(&self, input: RequestOrUSVString, init: RootedTraceableBox<RequestInit>) -> Rc<Promise> {
-        fetch::Fetch(self.upcast(), input, init)
-    }
-
     // https://w3c.github.io/hr-time/#the-performance-attribute
     fn Performance(&self) -> DomRoot<Performance> {
         self.performance.or_init(|| {
@@ -335,7 +318,6 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
         USVString(self.upcast::<GlobalScope>().origin().immutable().ascii_serialization())
     }
 }
-
 
 impl WorkerGlobalScope {
     #[allow(unsafe_code)]

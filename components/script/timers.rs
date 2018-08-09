@@ -8,10 +8,8 @@ use dom::bindings::codegen::Bindings::FunctionBinding::Function;
 use dom::bindings::reflector::DomObject;
 use dom::bindings::str::DOMString;
 use dom::document::FakeRequestAnimationFrameCallback;
-use dom::eventsource::EventSourceTimeoutCallback;
 use dom::globalscope::GlobalScope;
 use dom::testbinding::TestBindingCallback;
-use dom::xmlhttprequest::XHRTimeoutCallback;
 use euclid::Length;
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::Heap;
@@ -67,8 +65,6 @@ struct OneshotTimer {
 //     `invoke<T: DomObject>(self: Box<Self>, this: &T, js_timers: &JsTimers);`.
 #[derive(JSTraceable, MallocSizeOf)]
 pub enum OneshotTimerCallback {
-    XhrTimeout(XHRTimeoutCallback),
-    EventSourceTimeout(EventSourceTimeoutCallback),
     JsTimer(JsTimerTask),
     TestBindingCallback(TestBindingCallback),
     FakeRequestAnimationFrame(FakeRequestAnimationFrameCallback),
@@ -77,8 +73,6 @@ pub enum OneshotTimerCallback {
 impl OneshotTimerCallback {
     fn invoke<T: DomObject>(self, this: &T, js_timers: &JsTimers) {
         match self {
-            OneshotTimerCallback::XhrTimeout(callback) => callback.invoke(),
-            OneshotTimerCallback::EventSourceTimeout(callback) => callback.invoke(),
             OneshotTimerCallback::JsTimer(task) => task.invoke(this, js_timers),
             OneshotTimerCallback::TestBindingCallback(callback) => callback.invoke(),
             OneshotTimerCallback::FakeRequestAnimationFrame(callback) => callback.invoke(),

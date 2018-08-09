@@ -31,8 +31,6 @@ app_units = "0.7"
 audio-video-metadata = "0.1.4"
 base64 = "0.6"
 bitflags = "1.0"
-bluetooth_traits = {path = "../bluetooth_traits"}
-byteorder = "1.0"
 canvas_traits = {path = "../canvas_traits"}
 caseless = "0.2"
 cookie = "0.10"
@@ -47,8 +45,6 @@ encoding_rs = "0.7"
 enum-iterator = "0.2.0"
 euclid = "0.19"
 fnv = "1.0"
-gleam = "0.6"
-half = "1.0"
 html5ever = "0.22"
 hyper = "0.10"
 hyper_serde = "0.8"
@@ -69,19 +65,16 @@ mozjs = { version = "0.7.1", features = ["promises"]}
 msg = {path = "../msg"}
 net_traits = {path = "../net_traits"}
 num-traits = "0.1.32"
-offscreen_gl_context = {version = "0.21", features = ["serde"]}
 parking_lot = "0.6"
 phf = "0.7.18"
 profile_traits = {path = "../profile_traits"}
 ref_filter_map = "1.0.1"
 ref_slice = "1.0"
-regex = "1.0"
 script_layout_interface = {path = "../script_layout_interface"}
 script_plugins = {path = "../script_plugins"}
 script_traits = {path = "../script_traits"}
 selectors = { path = "../selectors" }
 serde = "1.0"
-serde_bytes = "0.10"
 servo_allocator = {path = "../allocator"}
 servo_arc = {path = "../servo_arc"}
 servo_atoms = {path = "../atoms"}
@@ -97,14 +90,9 @@ swapper = "0.1"
 time = "0.1.12"
 unicode-segmentation = "1.1.0"
 url = "1.6"
-utf-8 = "0.7"
 uuid = {version = "0.6", features = ["v4"]}
 xml5ever = {version = "0.12"}
 webrender_api = {git = "https://github.com/servo/webrender", features = ["ipc"]}
-webvr_traits = {path = "../webvr_traits"}
-
-[target.'cfg(not(target_os = "ios"))'.dependencies]
-mozangle = "0.1"
 
 [dev-dependencies]
 embedder_traits = { path = "../embedder_traits", features = ["tests"] }

@@ -23,8 +23,6 @@ extern crate audio_video_metadata;
 extern crate base64;
 #[macro_use]
 extern crate bitflags;
-extern crate bluetooth_traits;
-extern crate byteorder;
 extern crate canvas_traits;
 extern crate caseless;
 extern crate chrono;
@@ -40,10 +38,7 @@ extern crate encoding_rs;
 #[macro_use] extern crate enum_iterator;
 extern crate euclid;
 extern crate fnv;
-extern crate gleam;
-extern crate half;
 #[macro_use] extern crate html5ever;
-#[macro_use]
 extern crate hyper;
 extern crate hyper_serde;
 extern crate image;
@@ -62,25 +57,21 @@ extern crate metrics;
 extern crate mime;
 extern crate mime_guess;
 extern crate mitochondria;
-extern crate mozangle;
 #[macro_use]
 extern crate mozjs as js;
 extern crate msg;
 extern crate net_traits;
 extern crate num_traits;
-extern crate offscreen_gl_context;
 extern crate parking_lot;
 extern crate phf;
 #[macro_use]
 extern crate profile_traits;
 extern crate ref_filter_map;
 extern crate ref_slice;
-extern crate regex;
 extern crate script_layout_interface;
 extern crate script_traits;
 extern crate selectors;
 extern crate serde;
-extern crate serde_bytes;
 extern crate servo_allocator;
 extern crate servo_arc;
 #[macro_use] extern crate servo_atoms;
@@ -99,15 +90,12 @@ extern crate time;
 extern crate tinyfiledialogs;
 extern crate unicode_segmentation;
 extern crate url;
-extern crate utf8;
 extern crate uuid;
 extern crate webrender_api;
-extern crate webvr_traits;
 extern crate xml5ever;
 
 #[macro_use]
 mod task;
-mod body;
 pub mod clipboard_provider;
 mod devtools;
 pub mod document_loader;

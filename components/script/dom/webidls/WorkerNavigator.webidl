@@ -8,10 +8,3 @@ interface WorkerNavigator {};
 WorkerNavigator implements NavigatorID;
 WorkerNavigator implements NavigatorLanguage;
 //WorkerNavigator implements NavigatorOnLine;
-
-// https://w3c.github.io/permissions/#navigator-and-workernavigator-extension
-
-[Exposed=(Worker)]
-partial interface WorkerNavigator {
-  [Pref="dom.permissions.enabled"] readonly attribute Permissions permissions;
-};

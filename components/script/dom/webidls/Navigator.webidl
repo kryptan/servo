@@ -26,11 +26,6 @@ interface NavigatorID {
   readonly attribute DOMString userAgent;
 };
 
-// https://webbluetoothcg.github.io/web-bluetooth/#navigator-extensions
-partial interface Navigator {
-  [SameObject, Pref="dom.bluetooth.enabled"] readonly attribute Bluetooth bluetooth;
-};
-
 // https://w3c.github.io/ServiceWorker/#navigator-service-worker
 partial interface Navigator {
   [SameObject, Pref="dom.serviceworker.enabled"] readonly attribute ServiceWorkerContainer serviceWorker;
@@ -56,20 +51,4 @@ interface NavigatorPlugins {
 [NoInterfaceObject]
 interface NavigatorCookies {
   readonly attribute boolean cookieEnabled;
-};
-
-// https://w3c.github.io/webvr/spec/1.1/#interface-navigator
-partial interface Navigator {
-  [Pref="dom.webvr.enabled"] Promise<sequence<VRDisplay>> getVRDisplays();
-};
-
-// https://w3c.github.io/permissions/#navigator-and-workernavigator-extension
-[Exposed=(Window)]
-partial interface Navigator {
-  [Pref="dom.permissions.enabled"] readonly attribute Permissions permissions;
-};
-
-// https://w3c.github.io/gamepad/#navigator-interface-extension
-partial interface Navigator {
-    [Pref="dom.gamepad.enabled"] GamepadList getGamepads();
 };

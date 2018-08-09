@@ -4,8 +4,6 @@
 
 use app_units::Au;
 use base64;
-use bluetooth_traits::BluetoothRequest;
-use canvas_traits::webgl::WebGLChan;
 use cssparser::{Parser, ParserInput};
 use devtools_traits::{ScriptToDevtoolsControlMsg, TimelineMarker, TimelineMarkerType};
 use dom::bindings::cell::DomRefCell;
@@ -13,11 +11,8 @@ use dom::bindings::codegen::Bindings::DocumentBinding::{DocumentMethods, Documen
 use dom::bindings::codegen::Bindings::FunctionBinding::Function;
 use dom::bindings::codegen::Bindings::HistoryBinding::HistoryBinding::HistoryMethods;
 use dom::bindings::codegen::Bindings::MediaQueryListBinding::MediaQueryListBinding::MediaQueryListMethods;
-use dom::bindings::codegen::Bindings::PermissionStatusBinding::PermissionState;
-use dom::bindings::codegen::Bindings::RequestBinding::RequestInit;
 use dom::bindings::codegen::Bindings::WindowBinding::{self, FrameRequestCallback, WindowMethods};
 use dom::bindings::codegen::Bindings::WindowBinding::{ScrollBehavior, ScrollToOptions};
-use dom::bindings::codegen::UnionTypes::RequestOrUSVString;
 use dom::bindings::error::{Error, ErrorResult, Fallible};
 use dom::bindings::inheritance::Castable;
 use dom::bindings::num::Finite;
@@ -26,11 +21,8 @@ use dom::bindings::reflector::DomObject;
 use dom::bindings::root::{Dom, DomRoot, MutNullableDom};
 use dom::bindings::str::{DOMString, USVString};
 use dom::bindings::structuredclone::StructuredCloneData;
-use dom::bindings::trace::RootedTraceableBox;
 use dom::bindings::utils::{GlobalStaticData, WindowProxyHandler};
 use dom::bindings::weakref::DOMTracker;
-use dom::bluetooth::BluetoothExtraPermissionData;
-use dom::crypto::Crypto;
 use dom::cssstyledeclaration::{CSSModificationAccess, CSSStyleDeclaration, CSSStyleOwner};
 use dom::customelementregistry::CustomElementRegistry;
 use dom::document::{AnimationFrameCallback, Document};
@@ -47,17 +39,14 @@ use dom::messageevent::MessageEvent;
 use dom::navigator::Navigator;
 use dom::node::{Node, NodeDamage, document_from_node, from_untrusted_node_address};
 use dom::performance::Performance;
-use dom::promise::Promise;
 use dom::screen::Screen;
 use dom::storage::Storage;
-use dom::testrunner::TestRunner;
 use dom::windowproxy::WindowProxy;
 use dom::worklet::Worklet;
 use dom::workletglobalscope::WorkletGlobalScopeType;
 use dom_struct::dom_struct;
 use embedder_traits::EmbedderMsg;
 use euclid::{Point2D, Vector2D, Rect, Size2D, TypedPoint2D, TypedScale, TypedSize2D};
-use fetch;
 use ipc_channel::ipc::IpcSender;
 use ipc_channel::router::ROUTER;
 use js::jsapi::{JSAutoCompartment, JSContext};
@@ -128,7 +117,6 @@ use timers::{IsInterval, TimerCallback};
 use url::Position;
 use webdriver_handlers::jsval_to_webdriver;
 use webrender_api::{ExternalScrollId, DeviceIntPoint, DeviceUintSize, DocumentId};
-use webvr_traits::WebVRMsg;
 
 /// Current state of the window object
 #[derive(Clone, Copy, Debug, JSTraceable, MallocSizeOf, PartialEq)]
@@ -229,12 +217,6 @@ pub struct Window {
     /// The current size of the window, in pixels.
     window_size: Cell<Option<WindowSizeData>>,
 
-    /// A handle for communicating messages to the bluetooth thread.
-    #[ignore_malloc_size_of = "channels are hard"]
-    bluetooth_thread: IpcSender<BluetoothRequest>,
-
-    bluetooth_extra_permission_data: BluetoothExtraPermissionData,
-
     /// An enlarged rectangle around the page contents visible in the viewport, used
     /// to prevent creating display list items for content that is far away from the viewport.
     page_clip_rect: Cell<Rect<Au>>,
@@ -267,19 +249,6 @@ pub struct Window {
 
     /// All the MediaQueryLists we need to update
     media_query_lists: DOMTracker<MediaQueryList>,
-
-    test_runner: MutNullableDom<TestRunner>,
-
-    /// A handle for communicating messages to the WebGL thread, if available.
-    #[ignore_malloc_size_of = "channels are hard"]
-    webgl_chan: Option<WebGLChan>,
-
-    /// A handle for communicating messages to the webvr thread, if available.
-    #[ignore_malloc_size_of = "channels are hard"]
-    webvr_chan: Option<IpcSender<WebVRMsg>>,
-
-    /// A map for storing the previous permission state read results.
-    permission_state_invocation_results: DomRefCell<HashMap<String, PermissionState>>,
 
     /// All of the elements that have an outstanding image request that was
     /// initiated by layout during a reflow. They are stored in the script thread
@@ -404,14 +373,6 @@ impl Window {
             })
     }
 
-    pub fn bluetooth_thread(&self) -> IpcSender<BluetoothRequest> {
-        self.bluetooth_thread.clone()
-    }
-
-    pub fn bluetooth_extra_permission_data(&self) -> &BluetoothExtraPermissionData {
-         &self.bluetooth_extra_permission_data
-    }
-
     pub fn css_error_reporter(&self) -> Option<&ParseErrorReporter> {
         Some(&self.error_reporter)
     }
@@ -427,21 +388,9 @@ impl Window {
         self.current_viewport.clone().get()
     }
 
-    pub fn webgl_chan(&self) -> Option<WebGLChan> {
-        self.webgl_chan.clone()
-    }
-
-    pub fn webvr_thread(&self) -> Option<IpcSender<WebVRMsg>> {
-        self.webvr_chan.clone()
-    }
-
     fn new_paint_worklet(&self) -> DomRoot<Worklet> {
         debug!("Creating new paint worklet.");
         Worklet::new(self, WorkletGlobalScopeType::Paint)
-    }
-
-    pub fn permission_state_invocation_results(&self) -> &DomRefCell<HashMap<String, PermissionState>> {
-        &self.permission_state_invocation_results
     }
 
     pub fn pending_image_notification(&self, response: PendingImageResponse) {
@@ -625,11 +574,6 @@ impl WindowMethods for Window {
     // https://html.spec.whatwg.org/multipage/#dom-localstorage
     fn LocalStorage(&self) -> DomRoot<Storage> {
         self.local_storage.or_init(|| Storage::new(self, StorageType::Local))
-    }
-
-    // https://dvcs.w3.org/hg/webcrypto-api/raw-file/tip/spec/Overview.html#dfn-GlobalCrypto
-    fn Crypto(&self) -> DomRoot<Crypto> {
-        self.upcast::<GlobalScope>().crypto()
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-frameelement
@@ -1060,16 +1004,6 @@ impl WindowMethods for Window {
         let mql = MediaQueryList::new(&document, media_query_list);
         self.media_query_lists.track(&*mql);
         mql
-    }
-
-    #[allow(unrooted_must_root)]
-    // https://fetch.spec.whatwg.org/#fetch-method
-    fn Fetch(&self, input: RequestOrUSVString, init: RootedTraceableBox<RequestInit>) -> Rc<Promise> {
-        fetch::Fetch(&self.upcast(), input, init)
-    }
-
-    fn TestRunner(&self) -> DomRoot<TestRunner> {
-        self.test_runner.or_init(|| TestRunner::new(self.upcast()))
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-name
@@ -1869,7 +1803,6 @@ impl Window {
         image_cache_chan: Sender<ImageCacheMsg>,
         image_cache: Arc<ImageCache>,
         resource_threads: ResourceThreads,
-        bluetooth_thread: IpcSender<BluetoothRequest>,
         mem_profiler_chan: MemProfilerChan,
         time_profiler_chan: TimeProfilerChan,
         devtools_chan: Option<IpcSender<ScriptToDevtoolsControlMsg>>,
@@ -1884,8 +1817,6 @@ impl Window {
         origin: MutableOrigin,
         navigation_start: u64,
         navigation_start_precise: u64,
-        webgl_chan: Option<WebGLChan>,
-        webvr_chan: Option<IpcSender<WebVRMsg>>,
         microtask_queue: Rc<MicrotaskQueue>,
         webrender_document: DocumentId,
     ) -> DomRoot<Self> {
@@ -1937,8 +1868,6 @@ impl Window {
             parent_info,
             dom_static: GlobalStaticData::new(),
             js_runtime: DomRefCell::new(Some(runtime.clone())),
-            bluetooth_thread,
-            bluetooth_extra_permission_data: BluetoothExtraPermissionData::new(),
             page_clip_rect: Cell::new(MaxRect::max_rect()),
             resize_event: Default::default(),
             layout_chan,
@@ -1955,10 +1884,6 @@ impl Window {
             error_reporter,
             scroll_offsets: Default::default(),
             media_query_lists: DOMTracker::new(),
-            test_runner: Default::default(),
-            webgl_chan,
-            webvr_chan,
-            permission_state_invocation_results: Default::default(),
             pending_layout_images: Default::default(),
             unminified_js_dir: Default::default(),
             test_worklet: Default::default(),

@@ -9,7 +9,6 @@ use dom::bindings::reflector::{Reflector, reflect_dom_object};
 use dom::bindings::root::DomRoot;
 use dom::globalscope::GlobalScope;
 use dom_struct::dom_struct;
-use euclid::Size2D;
 use js::jsapi::{Heap, JSContext, JSObject};
 use js::rust::Runtime;
 use js::typedarray::{Uint8ClampedArray, CreateWith};
@@ -139,10 +138,6 @@ impl ImageData {
             let vec = array.unwrap().as_slice().to_vec();
             vec
         }
-    }
-
-    pub fn get_size(&self) -> Size2D<i32> {
-        Size2D::new(self.Width() as i32, self.Height() as i32)
     }
 }
 

@@ -206,45 +206,6 @@ impl Headers {
         }
     }
 
-    pub fn for_request(global: &GlobalScope) -> DomRoot<Headers> {
-        let headers_for_request = Headers::new(global);
-        headers_for_request.guard.set(Guard::Request);
-        headers_for_request
-    }
-
-    pub fn for_response(global: &GlobalScope) -> DomRoot<Headers> {
-        let headers_for_response = Headers::new(global);
-        headers_for_response.guard.set(Guard::Response);
-        headers_for_response
-    }
-
-    pub fn set_guard(&self, new_guard: Guard) {
-        self.guard.set(new_guard)
-    }
-
-    pub fn get_guard(&self) -> Guard {
-        self.guard.get()
-    }
-
-    pub fn empty_header_list(&self) {
-        *self.header_list.borrow_mut() = HyperHeaders::new();
-    }
-
-    pub fn set_headers(&self, hyper_headers: HyperHeaders) {
-        *self.header_list.borrow_mut() = hyper_headers;
-    }
-
-    pub fn get_headers_list(&self) -> HyperHeaders {
-        let mut headers = HyperHeaders::new();
-        headers.extend(self.header_list.borrow_mut().iter());
-        headers
-    }
-
-    // https://fetch.spec.whatwg.org/#concept-header-extract-mime-type
-    pub fn extract_mime_type(&self) -> Vec<u8> {
-        self.header_list.borrow().get_raw("content-type").map_or(vec![], |v| v[0].clone())
-    }
-
     pub fn sort_header_list(&self) -> Vec<(String, String)> {
         let borrowed_header_list = self.header_list.borrow();
         let headers_iter = borrowed_header_list.iter();

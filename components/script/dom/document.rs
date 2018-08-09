@@ -86,7 +86,6 @@ use dom::touchlist::TouchList;
 use dom::treewalker::TreeWalker;
 use dom::uievent::UIEvent;
 use dom::virtualmethods::vtable_for;
-use dom::webglcontextevent::WebGLContextEvent;
 use dom::window::{ReflowReason, Window};
 use dom::windowproxy::WindowProxy;
 use dom_struct::dom_struct;
@@ -1767,7 +1766,6 @@ impl Document {
             // https://html.spec.whatwg.org/multipage/#unloading-document-cleanup-steps
             let global_scope = self.window.upcast::<GlobalScope>();
             // Step 1 of clean-up steps.
-            global_scope.close_event_sources();
             let msg = ScriptMsg::DiscardDocument;
             let _ = global_scope.script_to_constellation_chan().send(msg);
         }
@@ -2032,10 +2030,8 @@ impl Document {
         *self.asap_scripts_set.borrow_mut() = vec![];
         self.asap_in_order_scripts_list.clear();
         self.deferred_scripts.clear();
-        let global_scope = self.window.upcast::<GlobalScope>();
         let loads_cancelled = self.loader.borrow_mut().cancel_all_loads();
-        let event_sources_canceled = global_scope.close_event_sources();
-        if loads_cancelled || event_sources_canceled {
+        if loads_cancelled {
             // If any loads were canceled.
             self.salvageable.set(false);
         };
@@ -3307,8 +3303,6 @@ impl DocumentMethods for Document {
                 )),
             "uievent" | "uievents" =>
                 Ok(DomRoot::upcast(UIEvent::new_uninitialized(&self.window))),
-            "webglcontextevent" =>
-                Ok(DomRoot::upcast(WebGLContextEvent::new_uninitialized(&self.window))),
             _ =>
                 Err(Error::NotSupported),
         }

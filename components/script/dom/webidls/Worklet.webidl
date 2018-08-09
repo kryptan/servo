@@ -9,5 +9,4 @@ interface Worklet {
 };
 
 dictionary WorkletOptions {
-    RequestCredentials credentials = "omit";
 };

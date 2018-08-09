@@ -159,13 +159,6 @@ impl FormData {
 
         File::new(&self.global(), BlobImpl::new_from_bytes(bytes), name, None, &blob.type_string())
     }
-
-    pub fn datums(&self) -> Vec<FormDatum> {
-        self.data.borrow().values()
-            .flat_map(|value| value.iter())
-            .map(|value| value.clone())
-            .collect()
-    }
 }
 
 impl Iterable for FormData {

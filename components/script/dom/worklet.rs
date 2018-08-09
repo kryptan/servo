@@ -10,7 +10,6 @@
 //! thread pool implementation, which only performs GC or code loading on
 //! a backup thread, not on the primary worklet thread.
 
-use dom::bindings::codegen::Bindings::RequestBinding::RequestCredentials;
 use dom::bindings::codegen::Bindings::WindowBinding::WindowBinding::WindowMethods;
 use dom::bindings::codegen::Bindings::WorkletBinding::WorkletMethods;
 use dom::bindings::codegen::Bindings::WorkletBinding::WorkletOptions;
@@ -38,11 +37,6 @@ use js::jsapi::JSTracer;
 use js::jsapi::JS_GC;
 use js::jsapi::JS_GetGCParameter;
 use msg::constellation_msg::PipelineId;
-use net_traits::IpcSend;
-use net_traits::load_whole_resource;
-use net_traits::request::Destination;
-use net_traits::request::RequestInit;
-use net_traits::request::RequestMode;
 use script_runtime::CommonScriptMsg;
 use script_runtime::Runtime;
 use script_runtime::ScriptThreadEventCategory;
@@ -109,7 +103,7 @@ impl Worklet {
 impl WorkletMethods for Worklet {
     #[allow(unrooted_must_root)]
     /// <https://drafts.css-houdini.org/worklets/#dom-worklet-addmodule>
-    fn AddModule(&self, module_url: USVString, options: &WorkletOptions) -> Rc<Promise> {
+    fn AddModule(&self, module_url: USVString, _options: &WorkletOptions) -> Rc<Promise> {
         // Step 1.
         let promise = Promise::new(self.window.upcast());
 
@@ -136,7 +130,6 @@ impl WorkletMethods for Worklet {
                                                self.window.origin().immutable().clone(),
                                                global.api_base_url(),
                                                module_url_record,
-                                               options.credentials.clone(),
                                                pending_tasks_struct,
                                                &promise);
 
@@ -282,7 +275,6 @@ impl WorkletThreadPool {
                                          origin: ImmutableOrigin,
                                          base_url: ServoUrl,
                                          script_url: ServoUrl,
-                                         credentials: RequestCredentials,
                                          pending_tasks_struct: PendingTasksStruct,
                                          promise: &Rc<Promise>)
     {
@@ -295,7 +287,6 @@ impl WorkletThreadPool {
                 origin: origin.clone(),
                 base_url: base_url.clone(),
                 script_url: script_url.clone(),
-                credentials: credentials,
                 pending_tasks_struct: pending_tasks_struct.clone(),
                 promise: TrustedPromise::new(promise.clone()),
             });
@@ -333,7 +324,6 @@ enum WorkletControl {
         origin: ImmutableOrigin,
         base_url: ServoUrl,
         script_url: ServoUrl,
-        credentials: RequestCredentials,
         pending_tasks_struct: PendingTasksStruct,
         promise: TrustedPromise,
     },
@@ -555,9 +545,8 @@ impl WorkletThread {
     fn fetch_and_invoke_a_worklet_script(&self,
                                          global_scope: &WorkletGlobalScope,
                                          pipeline_id: PipelineId,
-                                         origin: ImmutableOrigin,
+                                         _origin: ImmutableOrigin,
                                          script_url: ServoUrl,
-                                         credentials: RequestCredentials,
                                          pending_tasks_struct: PendingTasksStruct,
                                          promise: TrustedPromise)
     {
@@ -566,20 +555,8 @@ impl WorkletThread {
         // TODO: Settings object?
 
         // Step 2.
-        // TODO: Fetch a module graph, not just a single script.
-        // TODO: Fetch the script asynchronously?
-        // TODO: Caching.
-        let resource_fetcher = self.global_init.resource_threads.sender();
-        let request = RequestInit {
-            url: script_url,
-            destination: Destination::Script,
-            mode: RequestMode::CorsMode,
-            credentials_mode: credentials.into(),
-            origin,
-            .. RequestInit::default()
-        };
-        let script = load_whole_resource(request, &resource_fetcher).ok()
-            .and_then(|(_, bytes)| String::from_utf8(bytes).ok());
+        // FIXME:
+        let script: Result<String, ()> = Ok("".to_string());
 
         // Step 4.
         // NOTE: the spec parses and executes the script in separate steps,
@@ -622,7 +599,7 @@ impl WorkletThread {
         match control {
             WorkletControl::FetchAndInvokeAWorkletScript {
                 pipeline_id, worklet_id, global_type, origin, base_url,
-                script_url, credentials, pending_tasks_struct, promise,
+                script_url, pending_tasks_struct, promise,
             } => {
                 let global = self.get_worklet_global_scope(pipeline_id,
                                                            worklet_id,
@@ -632,7 +609,6 @@ impl WorkletThread {
                                                        pipeline_id,
                                                        origin,
                                                        script_url,
-                                                       credentials,
                                                        pending_tasks_struct,
                                                        promise)
             }
