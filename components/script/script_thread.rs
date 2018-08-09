@@ -50,8 +50,6 @@ use dom::mutationobserver::MutationObserver;
 use dom::node::{Node, NodeDamage, window_from_node, from_untrusted_node_address};
 use dom::performanceentry::PerformanceEntry;
 use dom::performancepainttiming::PerformancePaintTiming;
-use dom::serviceworker::TrustedServiceWorkerAddress;
-use dom::serviceworkerregistration::ServiceWorkerRegistration;
 use dom::servoparser::{ParserContext, ServoParser};
 use dom::transitionevent::TransitionEvent;
 use dom::uievent::UIEvent;
@@ -97,7 +95,6 @@ use script_traits::{UpdatePipelineIdReason, WindowSizeData, WindowSizeType};
 use script_traits::GuiApplication;
 use script_traits::CompositorEvent::{KeyEvent, MouseButtonEvent, MouseMoveEvent, ResizeEvent, TouchEvent};
 use script_traits::webdriver_msg::WebDriverScriptCommand;
-use serviceworkerjob::{Job, JobQueue};
 use servo_atoms::Atom;
 use servo_config::opts;
 use servo_url::{ImmutableOrigin, MutableOrigin, ServoUrl};
@@ -234,8 +231,6 @@ pub enum MainThreadScriptMsg {
         properties: Vec<Atom>,
         painter: Box<Painter>
     },
-    /// Dispatches a job queue.
-    DispatchJobQueue { scope_url: ServoUrl },
     /// Sends the final response to script thread for fetching after all redirections
     /// have been resolved
     NavigationResponse(PipelineId, FetchResponseMsg),
@@ -276,12 +271,6 @@ impl ScriptPort for Receiver<(TrustedWorkerAddress, MainThreadScriptMsg)> {
             Ok(_) => panic!("unexpected main thread event message!"),
             _ => Err(()),
         }
-    }
-}
-
-impl ScriptPort for Receiver<(TrustedServiceWorkerAddress, CommonScriptMsg)> {
-    fn recv(&self) -> Result<CommonScriptMsg, ()> {
-        self.recv().map(|(_, msg)| msg).map_err(|_| ())
     }
 }
 
@@ -408,10 +397,6 @@ pub struct ScriptThread {
     incomplete_loads: DomRefCell<Vec<InProgressLoad>>,
     /// A vector containing parser contexts which have not yet been fully processed
     incomplete_parser_contexts: RefCell<IncompleteParserContexts>,
-    /// A map to store service worker registrations for a given origin
-    registration_map: DomRefCell<HashMap<ServoUrl, Dom<ServiceWorkerRegistration>>>,
-    /// A job queue for Service Workers keyed by their scope url
-    job_queue_map: Rc<JobQueue>,
     /// Image cache for this script thread.
     image_cache: Arc<ImageCache>,
     /// A handle to the resource thread. This is an `Arc` to avoid running out of file descriptors if
@@ -661,15 +646,6 @@ impl ScriptThread {
         })
     }
 
-    #[allow(unrooted_must_root)]
-    pub fn schedule_job(job: Job) {
-        SCRIPT_THREAD_ROOT.with(|root| {
-            let script_thread = unsafe { &*root.get().unwrap() };
-            let job_queue = &*script_thread.job_queue_map;
-            job_queue.schedule_job(job, &script_thread);
-        });
-    }
-
     pub fn process_event(msg: CommonScriptMsg) {
         SCRIPT_THREAD_ROOT.with(|root| {
             if let Some(script_thread) = root.get() {
@@ -830,8 +806,6 @@ impl ScriptThread {
             window_proxies: DomRefCell::new(HashMap::new()),
             incomplete_loads: DomRefCell::new(vec!()),
             incomplete_parser_contexts: RefCell::new(vec!()),
-            registration_map: DomRefCell::new(HashMap::new()),
-            job_queue_map: Rc::new(JobQueue::new()),
 
             image_cache: state.image_cache.clone(),
             image_cache_channel: image_cache_channel,
@@ -1199,7 +1173,6 @@ impl ScriptThread {
                     MainThreadScriptMsg::Navigate(pipeline_id, ..) => Some(pipeline_id),
                     MainThreadScriptMsg::WorkletLoaded(pipeline_id) => Some(pipeline_id),
                     MainThreadScriptMsg::RegisterPaintWorklet { pipeline_id, .. } => Some(pipeline_id),
-                    MainThreadScriptMsg::DispatchJobQueue { .. }  => None,
                     MainThreadScriptMsg::NavigationResponse(pipeline_id, ..) => Some(pipeline_id),
                 }
             },
@@ -1369,9 +1342,6 @@ impl ScriptThread {
                     painter,
                 )
             },
-            MainThreadScriptMsg::DispatchJobQueue { scope_url } => {
-                self.job_queue_map.run_job(scope_url, self)
-            }
         }
     }
 
@@ -1744,43 +1714,6 @@ impl ScriptThread {
                 None
             }
         }
-    }
-
-    pub fn handle_get_registration(&self, scope_url: &ServoUrl) -> Option<DomRoot<ServiceWorkerRegistration>> {
-        let maybe_registration_ref = self.registration_map.borrow();
-        maybe_registration_ref.get(scope_url).map(|x| DomRoot::from_ref(&**x))
-    }
-
-    pub fn handle_serviceworker_registration(&self,
-                                         scope: &ServoUrl,
-                                         registration: &ServiceWorkerRegistration,
-                                         pipeline_id: PipelineId) {
-        {
-            let ref mut reg_ref = *self.registration_map.borrow_mut();
-            // according to spec we should replace if an older registration exists for
-            // same scope otherwise just insert the new one
-            let _ = reg_ref.remove(scope);
-            reg_ref.insert(scope.clone(), Dom::from_ref(registration));
-        }
-
-        // send ScopeThings to sw-manager
-        let ref maybe_registration_ref = *self.registration_map.borrow();
-        let maybe_registration = match maybe_registration_ref.get(scope) {
-            Some(r) => r,
-            None => return
-        };
-        let window = match { self.documents.borrow().find_window(pipeline_id) } {
-            Some(window) => window,
-            None => return warn!("Registration failed for {}", scope),
-        };
-
-        let script_url = maybe_registration.get_installed().get_script_url();
-        let scope_things = ServiceWorkerRegistration::create_scope_things(window.upcast(), script_url);
-        let _ = self.script_sender.send((pipeline_id, ScriptMsg::RegisterServiceWorker(scope_things, scope.clone())));
-    }
-
-    pub fn schedule_job_queue(&self, scope_url: ServoUrl) {
-        let _ = self.chan.0.send(MainThreadScriptMsg::DispatchJobQueue { scope_url });
     }
 
     pub fn dom_manipulation_task_source(&self, pipeline_id: PipelineId) -> DOMManipulationTaskSource {

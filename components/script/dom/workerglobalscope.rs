@@ -14,7 +14,6 @@ use dom::bindings::str::{DOMString, USVString};
 use dom::dedicatedworkerglobalscope::DedicatedWorkerGlobalScope;
 use dom::globalscope::GlobalScope;
 use dom::performance::Performance;
-use dom::serviceworkerglobalscope::ServiceWorkerGlobalScope;
 use dom::window::{base64_atob, base64_btoa};
 use dom::workerlocation::WorkerLocation;
 use dom::workernavigator::WorkerNavigator;
@@ -346,11 +345,8 @@ impl WorkerGlobalScope {
 
     pub fn script_chan(&self) -> Box<ScriptChan + Send> {
         let dedicated = self.downcast::<DedicatedWorkerGlobalScope>();
-        let service_worker = self.downcast::<ServiceWorkerGlobalScope>();
         if let Some(dedicated) = dedicated {
             return dedicated.script_chan();
-        } else if let Some(service_worker) = service_worker {
-            return service_worker.script_chan();
         } else {
             panic!("need to implement a sender for SharedWorker")
         }

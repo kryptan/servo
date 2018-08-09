@@ -10,7 +10,6 @@ use dom::bindings::str::DOMString;
 use dom::mimetypearray::MimeTypeArray;
 use dom::navigatorinfo;
 use dom::pluginarray::PluginArray;
-use dom::serviceworkercontainer::ServiceWorkerContainer;
 use dom::window::Window;
 use dom_struct::dom_struct;
 
@@ -19,7 +18,6 @@ pub struct Navigator {
     reflector_: Reflector,
     plugins: MutNullableDom<PluginArray>,
     mime_types: MutNullableDom<MimeTypeArray>,
-    service_worker: MutNullableDom<ServiceWorkerContainer>,
 }
 
 impl Navigator {
@@ -28,7 +26,6 @@ impl Navigator {
             reflector_: Reflector::new(),
             plugins: Default::default(),
             mime_types: Default::default(),
-            service_worker: Default::default(),
         }
     }
 
@@ -93,13 +90,6 @@ impl NavigatorMethods for Navigator {
     // https://html.spec.whatwg.org/multipage/#dom-navigator-javaenabled
     fn JavaEnabled(&self) -> bool {
         false
-    }
-
-    // https://w3c.github.io/ServiceWorker/#navigator-service-worker-attribute
-    fn ServiceWorker(&self) -> DomRoot<ServiceWorkerContainer> {
-        self.service_worker.or_init(|| {
-            ServiceWorkerContainer::new(&self.global())
-        })
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-navigator-cookieenabled

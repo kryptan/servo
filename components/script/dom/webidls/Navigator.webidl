@@ -26,11 +26,6 @@ interface NavigatorID {
   readonly attribute DOMString userAgent;
 };
 
-// https://w3c.github.io/ServiceWorker/#navigator-service-worker
-partial interface Navigator {
-  [SameObject, Pref="dom.serviceworker.enabled"] readonly attribute ServiceWorkerContainer serviceWorker;
-};
-
 // https://html.spec.whatwg.org/multipage/#navigatorlanguage
 [NoInterfaceObject, Exposed=(Window,Worker)]
 interface NavigatorLanguage {

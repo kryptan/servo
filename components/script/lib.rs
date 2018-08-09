@@ -109,8 +109,6 @@ mod network_listener;
 pub mod script_runtime;
 #[allow(unsafe_code)]
 pub mod script_thread;
-mod serviceworker_manager;
-mod serviceworkerjob;
 mod stylesheet_loader;
 mod task_source;
 pub mod test;
@@ -142,7 +140,6 @@ use dom::bindings::proxyhandler;
 use dom::bindings::utils::is_platform_object;
 use js::jsapi::JSObject;
 use script_traits::SWManagerSenders;
-use serviceworker_manager::ServiceWorkerManager;
 
 #[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
@@ -185,9 +182,7 @@ fn perform_platform_specific_initialization() {
 #[cfg(not(target_os = "linux"))]
 fn perform_platform_specific_initialization() {}
 
-pub fn init_service_workers(sw_senders: SWManagerSenders) {
-    // Spawn the service worker manager passing the constellation sender
-    ServiceWorkerManager::spawn_manager(sw_senders);
+pub fn init_service_workers(_sw_senders: SWManagerSenders) {
 }
 
 #[allow(unsafe_code)]
