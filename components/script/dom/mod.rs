@@ -394,6 +394,7 @@ pub mod promisenativehandler;
 pub mod radionodelist;
 pub mod range;
 pub mod screen;
+pub mod serviceworkerglobalscope;
 pub mod servoparser;
 pub mod storage;
 pub mod storageevent;
