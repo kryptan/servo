@@ -52,7 +52,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use task::TaskCanceller;
 use task_source::TaskSourceName;
-use task_source::file_reading::FileReadingTaskSource;
 use task_source::networking::NetworkingTaskSource;
 use task_source::performance_timeline::PerformanceTimelineTaskSource;
 use task_source::remote_event::RemoteEventTaskSource;
@@ -564,18 +563,6 @@ impl GlobalScope {
         }
         if let Some(worker) = self.downcast::<WorkerGlobalScope>() {
             return worker.process_event(msg);
-        }
-        unreachable!();
-    }
-
-    /// Channel to send messages to the file reading task source of
-    /// this of this global scope.
-    pub fn file_reading_task_source(&self) -> FileReadingTaskSource {
-        if let Some(window) = self.downcast::<Window>() {
-            return window.file_reading_task_source();
-        }
-        if let Some(worker) = self.downcast::<WorkerGlobalScope>() {
-            return worker.file_reading_task_source();
         }
         unreachable!();
     }

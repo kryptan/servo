@@ -7,13 +7,10 @@ use devtools_traits::ScriptToDevtoolsControlMsg;
 use document_loader::{DocumentLoader, LoadType};
 use dom::activation::{ActivationSource, synthetic_click_activation};
 use dom::attr::Attr;
-use dom::beforeunloadevent::BeforeUnloadEvent;
 use dom::bindings::callback::ExceptionHandling;
 use dom::bindings::cell::DomRefCell;
-use dom::bindings::codegen::Bindings::BeforeUnloadEventBinding::BeforeUnloadEventBinding::BeforeUnloadEventMethods;
 use dom::bindings::codegen::Bindings::DocumentBinding;
 use dom::bindings::codegen::Bindings::DocumentBinding::{DocumentMethods, DocumentReadyState, ElementCreationOptions};
-use dom::bindings::codegen::Bindings::EventBinding::EventBinding::EventMethods;
 use dom::bindings::codegen::Bindings::HTMLIFrameElementBinding::HTMLIFrameElementBinding::HTMLIFrameElementMethods;
 use dom::bindings::codegen::Bindings::NodeBinding::NodeMethods;
 use dom::bindings::codegen::Bindings::NodeFilterBinding::NodeFilter;
@@ -73,7 +70,6 @@ use dom::nodelist::NodeList;
 use dom::pagetransitionevent::PageTransitionEvent;
 use dom::popstateevent::PopStateEvent;
 use dom::processinginstruction::ProcessingInstruction;
-use dom::progressevent::ProgressEvent;
 use dom::promise::Promise;
 use dom::range::Range;
 use dom::servoparser::ServoParser;
@@ -96,7 +92,7 @@ use fetch::FetchCanceller;
 use html5ever::{LocalName, Namespace, QualName};
 use hyper::header::{Header, SetCookie};
 use hyper_serde::Serde;
-use ipc_channel::ipc::{self, IpcSender};
+use ipc_channel::ipc::{IpcSender};
 use js::jsapi::{JSContext, JSObject, JSRuntime};
 use js::jsapi::JS_GetRuntime;
 use metrics::{InteractiveFlag, InteractiveMetrics, InteractiveWindow, ProfilerMetadataFactory, ProgressiveWebMetric};
@@ -1656,34 +1652,10 @@ impl Document {
         // Step 2
         self.incr_ignore_opens_during_unload_counter();
         //Step 3-5.
-        let document = Trusted::new(self);
-        let beforeunload_event = BeforeUnloadEvent::new(&self.window,
-                                           atom!("beforeunload"),
-                                           EventBubbles::Bubbles,
-                                           EventCancelable::Cancelable);
-        let event = beforeunload_event.upcast::<Event>();
-        event.set_trusted(true);
-        let event_target = self.window.upcast::<EventTarget>();
-        let has_listeners = event.has_listeners_for(&event_target, &atom!("beforeunload"));
-        event_target.dispatch_event_with_target(
-            document.root().upcast(),
-            &event,
-        );
         // TODO: Step 6, decrease the event loop's termination nesting level by 1.
         // Step 7
-        if has_listeners {
-            self.salvageable.set(false);
-        }
         let mut can_unload = true;
         // TODO: Step 8, also check sandboxing modals flag.
-        let default_prevented = event.DefaultPrevented();
-        let return_value_not_empty = !event.downcast::<BeforeUnloadEvent>().unwrap().ReturnValue().is_empty();
-        if default_prevented || return_value_not_empty {
-            let (chan, port) = ipc::channel().expect("Failed to create IPC channel!");
-            let msg = EmbedderMsg::AllowUnload(chan);
-            self.send_to_embedder(msg);
-            can_unload = port.recv().unwrap();
-        }
         // Step 9
         if !recursive_flag {
             for iframe in self.iter_iframes() {
@@ -3264,8 +3236,6 @@ impl DocumentMethods for Document {
     fn CreateEvent(&self, mut interface: DOMString) -> Fallible<DomRoot<Event>> {
         interface.make_ascii_lowercase();
         match &*interface {
-            "beforeunloadevent" =>
-                Ok(DomRoot::upcast(BeforeUnloadEvent::new_uninitialized(&self.window))),
             "closeevent" =>
                 Ok(DomRoot::upcast(CloseEvent::new_uninitialized(self.window.upcast()))),
             "customevent" =>
@@ -3288,8 +3258,6 @@ impl DocumentMethods for Document {
                 Ok(DomRoot::upcast(PageTransitionEvent::new_uninitialized(&self.window))),
             "popstateevent" =>
                 Ok(DomRoot::upcast(PopStateEvent::new_uninitialized(&self.window))),
-            "progressevent" =>
-                Ok(DomRoot::upcast(ProgressEvent::new_uninitialized(self.window.upcast()))),
             "storageevent" => {
                 Ok(DomRoot::upcast(StorageEvent::new_uninitialized(&self.window, "".into())))
             },

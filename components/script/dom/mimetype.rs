@@ -4,9 +4,7 @@
 
 use dom::bindings::codegen::Bindings::MimeTypeBinding::MimeTypeMethods;
 use dom::bindings::reflector::Reflector;
-use dom::bindings::root::DomRoot;
 use dom::bindings::str::DOMString;
-use dom::plugin::Plugin;
 use dom_struct::dom_struct;
 
 #[dom_struct]
@@ -27,11 +25,6 @@ impl MimeTypeMethods for MimeType {
 
     // https://html.spec.whatwg.org/multipage/#dom-mimetype-suffixes
     fn Suffixes(&self) -> DOMString {
-        unreachable!()
-    }
-
-    // https://html.spec.whatwg.org/multipage/#dom-mimetype-enabledplugin
-    fn EnabledPlugin(&self) -> DomRoot<Plugin> {
         unreachable!()
     }
 }

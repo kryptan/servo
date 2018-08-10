@@ -5856,8 +5856,6 @@ def generate_imports(config, cgthings, descriptors, callbacks=None, dictionaries
         'dom::bindings::htmlconstructor::push_new_element_queue',
         'dom::bindings::iterable::Iterable',
         'dom::bindings::iterable::IteratorType',
-        'dom::bindings::namespace::NamespaceObjectClass',
-        'dom::bindings::namespace::create_namespace_object',
         'dom::bindings::reflector::MutDomObject',
         'dom::bindings::reflector::DomObject',
         'dom::bindings::root::Dom',

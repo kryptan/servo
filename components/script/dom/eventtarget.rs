@@ -2,14 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use dom::beforeunloadevent::BeforeUnloadEvent;
 use dom::bindings::callback::{CallbackContainer, ExceptionHandling, CallbackFunction};
 use dom::bindings::cell::DomRefCell;
-use dom::bindings::codegen::Bindings::BeforeUnloadEventBinding::BeforeUnloadEventMethods;
 use dom::bindings::codegen::Bindings::ErrorEventBinding::ErrorEventMethods;
 use dom::bindings::codegen::Bindings::EventBinding::EventMethods;
 use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
-use dom::bindings::codegen::Bindings::EventHandlerBinding::OnBeforeUnloadEventHandlerNonNull;
 use dom::bindings::codegen::Bindings::EventHandlerBinding::OnErrorEventHandlerNonNull;
 use dom::bindings::codegen::Bindings::EventListenerBinding::EventListener;
 use dom::bindings::codegen::Bindings::EventTargetBinding::AddEventListenerOptions;
@@ -59,10 +56,6 @@ pub enum CommonEventHandler {
     ErrorEventHandler(
         #[ignore_malloc_size_of = "Rc"]
         Rc<OnErrorEventHandlerNonNull>),
-
-    BeforeUnloadEventHandler(
-        #[ignore_malloc_size_of = "Rc"]
-        Rc<OnBeforeUnloadEventHandlerNonNull>),
 }
 
 impl CommonEventHandler {
@@ -70,7 +63,6 @@ impl CommonEventHandler {
         match *self {
             CommonEventHandler::EventHandler(ref handler) => &handler.parent,
             CommonEventHandler::ErrorEventHandler(ref handler) => &handler.parent,
-            CommonEventHandler::BeforeUnloadEventHandler(ref handler) => &handler.parent,
         }
     }
 }
@@ -183,26 +175,6 @@ impl CompiledEventListener {
 
                         let _ = handler.Call_(object, EventOrString::Event(DomRoot::from_ref(event)),
                                               None, None, None, None, exception_handle);
-                    }
-
-                    CommonEventHandler::BeforeUnloadEventHandler(ref handler) => {
-                        if let Some(event) = event.downcast::<BeforeUnloadEvent>() {
-                            // Step 5
-                            if let Ok(value) = handler.Call_(object,
-                                                             event.upcast::<Event>(),
-                                                             exception_handle) {
-                                let rv = event.ReturnValue();
-                                if let Some(v) =  value {
-                                    if rv.is_empty() {
-                                        event.SetReturnValue(v);
-                                    }
-                                    event.upcast::<Event>().PreventDefault();
-                                }
-                            }
-                        } else {
-                            // Step 5, "Otherwise" clause
-                            let _ = handler.Call_(object, event.upcast::<Event>(), exception_handle);
-                        }
                     }
 
                     CommonEventHandler::EventHandler(ref handler) => {
@@ -490,15 +462,9 @@ impl EventTarget {
                 unsafe { OnErrorEventHandlerNonNull::new(cx, funobj) },
             ))
         } else {
-            if ty == &atom!("beforeunload") {
-                Some(CommonEventHandler::BeforeUnloadEventHandler(
-                    unsafe { OnBeforeUnloadEventHandlerNonNull::new(cx, funobj) },
-                ))
-            } else {
-                Some(CommonEventHandler::EventHandler(
-                    unsafe { EventHandlerNonNull::new(cx, funobj) },
-                ))
-            }
+            Some(CommonEventHandler::EventHandler(
+                unsafe { EventHandlerNonNull::new(cx, funobj) },
+            ))
         }
     }
 
@@ -535,25 +501,6 @@ impl EventTarget {
         let event_listener = listener.map(|listener| {
             InlineEventListener::Compiled(CommonEventHandler::ErrorEventHandler(
                 unsafe { OnErrorEventHandlerNonNull::new(cx, listener.callback()) }
-            ))
-        });
-        self.set_inline_event_listener(Atom::from(ty), event_listener);
-    }
-
-    #[allow(unsafe_code)]
-    pub fn set_beforeunload_event_handler<T: CallbackContainer>(
-        &self,
-        ty: &str,
-        listener: Option<Rc<T>>,
-    )
-    where
-        T: CallbackContainer,
-    {
-        let cx = self.global().get_cx();
-
-        let event_listener = listener.map(|listener| {
-            InlineEventListener::Compiled(CommonEventHandler::BeforeUnloadEventHandler(
-                unsafe { OnBeforeUnloadEventHandlerNonNull::new(cx, listener.callback()) }
             ))
         });
         self.set_inline_event_listener(Atom::from(ty), event_listener);

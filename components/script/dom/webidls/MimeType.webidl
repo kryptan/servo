@@ -8,5 +8,4 @@ interface MimeType {
   readonly attribute DOMString type;
   readonly attribute DOMString description;
   readonly attribute DOMString suffixes; // comma-separated
-  readonly attribute Plugin enabledPlugin;
 };

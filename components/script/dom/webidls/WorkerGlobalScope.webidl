@@ -20,5 +20,4 @@ interface WorkerGlobalScope : GlobalScope {
 partial interface WorkerGlobalScope { // not obsolete
   [Throws]
   void importScripts(DOMString... urls);
-  readonly attribute WorkerNavigator navigator;
 };

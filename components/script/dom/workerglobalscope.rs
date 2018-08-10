@@ -16,7 +16,6 @@ use dom::globalscope::GlobalScope;
 use dom::performance::Performance;
 use dom::window::{base64_atob, base64_btoa};
 use dom::workerlocation::WorkerLocation;
-use dom::workernavigator::WorkerNavigator;
 use dom_struct::dom_struct;
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::{JSAutoCompartment, JSContext, JSRuntime};
@@ -36,7 +35,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use task::TaskCanceller;
-use task_source::file_reading::FileReadingTaskSource;
 use task_source::networking::NetworkingTaskSource;
 use task_source::performance_timeline::PerformanceTimelineTaskSource;
 use task_source::remote_event::RemoteEventTaskSource;
@@ -73,7 +71,6 @@ pub struct WorkerGlobalScope {
     #[ignore_malloc_size_of = "Defined in js"]
     runtime: Runtime,
     location: MutNullableDom<WorkerLocation>,
-    navigator: MutNullableDom<WorkerNavigator>,
 
     #[ignore_malloc_size_of = "Defined in ipc-channel"]
     /// Optional `IpcSender` for sending the `DevtoolScriptControlMsg`
@@ -116,7 +113,6 @@ impl WorkerGlobalScope {
             closing,
             runtime,
             location: Default::default(),
-            navigator: Default::default(),
             from_devtools_sender: init.from_devtools_sender,
             from_devtools_receiver,
             navigation_start_precise: precise_time_ns(),
@@ -150,10 +146,6 @@ impl WorkerGlobalScope {
 
     pub fn get_url(&self) -> &ServoUrl {
         &self.worker_url
-    }
-
-    pub fn get_worker_id(&self) -> WorkerId {
-        self.worker_id.clone()
     }
 
     pub fn task_canceller(&self) -> TaskCanceller {
@@ -231,11 +223,6 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
         }
 
         Ok(())
-    }
-
-    // https://html.spec.whatwg.org/multipage/#dom-worker-navigator
-    fn Navigator(&self) -> DomRoot<WorkerNavigator> {
-        self.navigator.or_init(|| WorkerNavigator::new(self))
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-windowbase64-btoa
@@ -350,10 +337,6 @@ impl WorkerGlobalScope {
         } else {
             panic!("need to implement a sender for SharedWorker")
         }
-    }
-
-    pub fn file_reading_task_source(&self) -> FileReadingTaskSource {
-        FileReadingTaskSource(self.script_chan(), self.pipeline_id())
     }
 
     pub fn networking_task_source(&self) -> NetworkingTaskSource {

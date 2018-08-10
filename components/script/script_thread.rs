@@ -112,7 +112,6 @@ use std::sync::mpsc::{Receiver, Select, Sender, channel};
 use std::thread;
 use style::thread_state::{self, ThreadState};
 use task_source::dom_manipulation::DOMManipulationTaskSource;
-use task_source::file_reading::FileReadingTaskSource;
 use task_source::history_traversal::HistoryTraversalTaskSource;
 use task_source::networking::NetworkingTaskSource;
 use task_source::performance_timeline::PerformanceTimelineTaskSource;
@@ -1732,10 +1731,6 @@ impl ScriptThread {
         NetworkingTaskSource(self.networking_task_sender.clone(), pipeline_id)
     }
 
-    pub fn file_reading_task_source(&self, pipeline_id: PipelineId) -> FileReadingTaskSource {
-        FileReadingTaskSource(self.file_reading_task_sender.clone(), pipeline_id)
-    }
-
     pub fn remote_event_task_source(&self, pipeline_id: PipelineId) -> RemoteEventTaskSource {
         RemoteEventTaskSource(self.remote_event_task_sender.clone(), pipeline_id)
     }
@@ -2046,7 +2041,6 @@ impl ScriptThread {
             self.user_interaction_task_source(incomplete.pipeline_id),
             self.networking_task_source(incomplete.pipeline_id),
             HistoryTraversalTaskSource(history_sender.clone()),
-            self.file_reading_task_source(incomplete.pipeline_id),
             self.performance_timeline_task_source(incomplete.pipeline_id).clone(),
             self.remote_event_task_source(incomplete.pipeline_id),
             self.image_cache_channel.clone(),

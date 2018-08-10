@@ -36,7 +36,6 @@ use dom::location::Location;
 use dom::mediaquerylist::{MediaQueryList, MediaQueryListMatchState};
 use dom::mediaquerylistevent::MediaQueryListEvent;
 use dom::messageevent::MessageEvent;
-use dom::navigator::Navigator;
 use dom::node::{Node, NodeDamage, document_from_node, from_untrusted_node_address};
 use dom::performance::Performance;
 use dom::screen::Screen;
@@ -106,7 +105,6 @@ use style_traits::{CSSPixel, DevicePixel, ParsingMode};
 use task::TaskCanceller;
 use task_source::TaskSourceName;
 use task_source::dom_manipulation::DOMManipulationTaskSource;
-use task_source::file_reading::FileReadingTaskSource;
 use task_source::history_traversal::HistoryTraversalTaskSource;
 use task_source::networking::NetworkingTaskSource;
 use task_source::performance_timeline::PerformanceTimelineTaskSource;
@@ -164,12 +162,9 @@ pub struct Window {
     #[ignore_malloc_size_of = "task sources are hard"]
     history_traversal_task_source: HistoryTraversalTaskSource,
     #[ignore_malloc_size_of = "task sources are hard"]
-    file_reading_task_source: FileReadingTaskSource,
-    #[ignore_malloc_size_of = "task sources are hard"]
     performance_timeline_task_source: PerformanceTimelineTaskSource,
     #[ignore_malloc_size_of = "task sources are hard"]
     remote_event_task_source: RemoteEventTaskSource,
-    navigator: MutNullableDom<Navigator>,
     #[ignore_malloc_size_of = "Arc"]
     image_cache: Arc<ImageCache>,
     #[ignore_malloc_size_of = "channels are hard"]
@@ -326,10 +321,6 @@ impl Window {
 
     pub fn history_traversal_task_source(&self) -> Box<ScriptChan + Send> {
         self.history_traversal_task_source.clone()
-    }
-
-    pub fn file_reading_task_source(&self) -> FileReadingTaskSource {
-        self.file_reading_task_source.clone()
     }
 
     pub fn performance_timeline_task_source(&self) -> PerformanceTimelineTaskSource {
@@ -592,11 +583,6 @@ impl WindowMethods for Window {
         }
         // Step 7.
         Some(DomRoot::from_ref(container))
-    }
-
-    // https://html.spec.whatwg.org/multipage/#dom-navigator
-    fn Navigator(&self) -> DomRoot<Navigator> {
-        self.navigator.or_init(|| Navigator::new(self))
     }
 
     #[allow(unsafe_code)]
@@ -1797,7 +1783,6 @@ impl Window {
         user_interaction_task_source: UserInteractionTaskSource,
         networking_task_source: NetworkingTaskSource,
         history_traversal_task_source: HistoryTraversalTaskSource,
-        file_reading_task_source: FileReadingTaskSource,
         performance_timeline_task_source: PerformanceTimelineTaskSource,
         remote_event_task_source: RemoteEventTaskSource,
         image_cache_chan: Sender<ImageCacheMsg>,
@@ -1847,12 +1832,10 @@ impl Window {
             user_interaction_task_source,
             networking_task_source,
             history_traversal_task_source,
-            file_reading_task_source,
             performance_timeline_task_source,
             remote_event_task_source,
             image_cache_chan,
             image_cache,
-            navigator: Default::default(),
             location: Default::default(),
             history: Default::default(),
             custom_element_registry: Default::default(),

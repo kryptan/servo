@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 pub use dom::bindings::str::{ByteString, DOMString};
-pub use dom::headers::normalize_value;
 
 // For compile-fail tests only.
 pub use dom::bindings::cell::DomRefCell;

@@ -24,7 +24,7 @@ use dom::bindings::str::DOMString;
 use dom::document::Document;
 use dom::element::{AttributeMutation, Element, RawLayoutElementHelpers};
 use dom::element::{reflect_cross_origin_attribute, set_cross_origin_attribute};
-use dom::event::{Event, EventBubbles, EventCancelable};
+use dom::event::{Event};
 use dom::eventtarget::EventTarget;
 use dom::htmlareaelement::HTMLAreaElement;
 use dom::htmlelement::HTMLElement;
@@ -34,7 +34,6 @@ use dom::htmlpictureelement::HTMLPictureElement;
 use dom::htmlsourceelement::HTMLSourceElement;
 use dom::mouseevent::MouseEvent;
 use dom::node::{Node, NodeDamage, document_from_node, window_from_node};
-use dom::progressevent::ProgressEvent;
 use dom::values::UNSIGNED_LONG_MAX;
 use dom::virtualmethods::VirtualMethods;
 use dom::window::Window;
@@ -731,25 +730,7 @@ impl HTMLImageElement {
             },
         };
         // Step 10.
-        let target = Trusted::new(self.upcast::<EventTarget>());
         // FIXME(nox): Why are errors silenced here?
-        let _ = task_source.queue(
-            task!(fire_progress_event: move || {
-                let target = target.root();
-
-                let event = ProgressEvent::new(
-                    &target.global(),
-                    atom!("loadstart"),
-                    EventBubbles::DoesNotBubble,
-                    EventCancelable::NotCancelable,
-                    false,
-                    0,
-                    0,
-                );
-                event.upcast::<Event>().fire(&target);
-            }),
-            window.upcast(),
-        );
         // Step 11
         let base_url = document.base_url();
         let parsed_url = base_url.join(&src);
