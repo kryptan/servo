@@ -1,6 +1,7 @@
 extern crate servo_gui;
 
 use servo_gui::{GuiApplication, GuiApplicationResponse};
+use servo_gui::dom::{Event, EventTarget};
 
 fn main() {
     servo_gui::run("Servo Example Application", Box::new(App));
@@ -23,6 +24,13 @@ impl GuiApplication for App {
         }
     }
 
-    fn handle_event(&mut self, _name: &str, _event: ()) {
+    fn handle_event(&mut self, name: &str, _event_target: &EventTarget, _event: &Event) {
+        match name {
+            "image_click" => {
+                println!("You have clicked on the image, congratulations!");
+
+            }
+            _ => {}
+        }
     }
 }

@@ -33,6 +33,7 @@ use dom::node::document_from_node;
 use dom::virtualmethods::VirtualMethods;
 use dom::window::Window;
 use dom_struct::dom_struct;
+use script_thread::ScriptThread;
 use fnv::FnvHasher;
 use js::jsapi::{JS_GetFunctionObject, JSAutoCompartment, JSFunction};
 use js::rust::{AutoObjectVectorWrapper, CompileOptionsWrapper};
@@ -94,6 +95,7 @@ struct InternalRawUncompiledHandler {
 enum InlineEventListener {
     Uncompiled(InternalRawUncompiledHandler),
     Compiled(CommonEventHandler),
+    Rust(String),
     Null,
 }
 
@@ -116,6 +118,7 @@ impl InlineEventListener {
                 *self = InlineEventListener::Compiled(handler.clone());
                 Some(handler)
             }
+            InlineEventListener::Rust(_) => None,
         }
     }
 }
@@ -130,6 +133,8 @@ impl EventListenerType {
     fn get_compiled_listener(&mut self, owner: &EventTarget, ty: &Atom)
                              -> Option<CompiledEventListener> {
         match self {
+            &mut EventListenerType::Inline(InlineEventListener::Rust(ref mut name)) =>
+                Some(CompiledEventListener::RustNamed(name.clone())),
             &mut EventListenerType::Inline(ref mut inline) =>
                 inline.get_compiled_handler(owner, ty)
                       .map(CompiledEventListener::Handler),
@@ -144,20 +149,28 @@ impl EventListenerType {
 pub enum CompiledEventListener {
     Listener(Rc<EventListener>),
     Handler(CommonEventHandler),
+    RustNamed(String),
+    RustFunction(Box<Fn(&EventTarget, &Event)>),
 }
 
 impl CompiledEventListener {
     #[allow(unsafe_code)]
     // https://html.spec.whatwg.org/multipage/#the-event-handler-processing-algorithm
-    pub fn call_or_handle_event<T: DomObject>(&self,
-                                              object: &T,
-                                              event: &Event,
-                                              exception_handle: ExceptionHandling) {
+    pub fn call_or_handle_event(&self,
+                                object: &EventTarget,
+                                event: &Event,
+                                exception_handle: ExceptionHandling) {
         // Step 3
         match *self {
             CompiledEventListener::Listener(ref listener) => {
                 let _ = listener.HandleEvent_(object, event, exception_handle);
             },
+            CompiledEventListener::RustFunction(ref closure) => {
+                closure(object, event);
+            }
+            CompiledEventListener::RustNamed(ref name) => {
+                ScriptThread::call_rust_event_handler(name, object, event);
+            }
             CompiledEventListener::Handler(ref handler) => {
                 match *handler {
                     CommonEventHandler::ErrorEventHandler(ref handler) => {
@@ -397,13 +410,18 @@ impl EventTarget {
                                         line: usize,
                                         ty: &str,
                                         source: DOMString) {
-        let handler = InternalRawUncompiledHandler {
-            source: source,
-            line: line,
-            url: url,
+        let listener = if source.starts_with("rust:") {
+            InlineEventListener::Rust(source[5..].to_string())
+        } else {
+            let handler = InternalRawUncompiledHandler {
+                source,
+                line,
+                url,
+            };
+            InlineEventListener::Uncompiled(handler)
         };
         self.set_inline_event_listener(Atom::from(ty),
-                                       Some(InlineEventListener::Uncompiled(handler)));
+                                       Some(listener));
     }
 
     // https://html.spec.whatwg.org/multipage/#getting-the-current-value-of-the-event-handler

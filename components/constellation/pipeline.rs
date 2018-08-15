@@ -28,10 +28,10 @@ use script_traits::{DocumentActivity, InitialScriptState};
 use script_traits::{LayoutControlMsg, LayoutMsg, LoadData};
 use script_traits::{NewLayoutInfo, SWManagerMsg, SWManagerSenders};
 use script_traits::{ScriptThreadFactory, TimerSchedulerMsg, WindowSizeData};
-use script_traits::GuiApplication;
 use servo_config::opts::{self, Opts};
 use servo_config::prefs::{PREFS, Pref};
 use servo_url::ServoUrl;
+use std::any::Any;
 use std::collections::{HashMap, HashSet};
 #[cfg(not(windows))]
 use std::env;
@@ -191,7 +191,7 @@ pub struct InitialPipelineState {
     pub webvr_chan: Option<IpcSender<WebVRMsg>>,
 
     /// Application which uses Servo as a GUI library.
-    pub gui_application: Option<Box<GuiApplication>>,
+    pub gui_application: Option<Box<dyn Any + Send>>,
 }
 
 impl Pipeline {
@@ -511,7 +511,7 @@ pub struct UnprivilegedPipelineContent {
     webgl_chan: Option<WebGLPipeline>,
     webvr_chan: Option<IpcSender<WebVRMsg>>,
     #[serde(skip)] // always used in the same process
-    gui_application: Option<Box<GuiApplication>>,
+    gui_application: Option<Box<dyn Any + Send>>,
 }
 
 impl UnprivilegedPipelineContent {

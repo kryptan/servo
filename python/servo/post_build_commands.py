@@ -261,7 +261,7 @@ class PostBuildCommands(CommandBase):
                         copy2(full_name, destination)
 
         return self.call_rustup_run(
-            ["cargo", "doc", "--manifest-path", self.ports_servo_manifest()] + params,
+            ["cargo", "doc"] + params, # "--manifest-path", self.ports_servo_manifest()] + params,
             env=self.build_env()
         )
 

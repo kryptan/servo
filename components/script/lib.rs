@@ -114,6 +114,7 @@ pub mod document_loader;
 #[macro_use]
 mod dom;
 pub mod fetch;
+pub mod gui;
 mod layout_image;
 mod mem;
 mod microtask;

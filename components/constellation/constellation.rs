@@ -131,7 +131,6 @@ use script_traits::{LayoutMsg as FromLayoutMsg, ScriptMsg as FromScriptMsg, Scri
 use script_traits::{LogEntry, ScriptToConstellationChan, ServiceWorkerMsg, webdriver_msg};
 use script_traits::{SWManagerMsg, ScopeThings, UpdatePipelineIdReason, WebDriverCommandMsg};
 use script_traits::{WindowSizeData, WindowSizeType};
-use script_traits::GuiApplication;
 use serde::{Deserialize, Serialize};
 use servo_config::opts;
 use servo_config::prefs::PREFS;
@@ -139,6 +138,7 @@ use servo_rand::{Rng, SeedableRng, ServoRng, random};
 use servo_remutex::ReentrantMutex;
 use servo_url::{Host, ImmutableOrigin, ServoUrl};
 use session_history::{JointSessionHistory, NeedsToReload, SessionHistoryChange, SessionHistoryDiff};
+use std::any::Any;
 use std::borrow::ToOwned;
 use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomData;
@@ -332,7 +332,7 @@ pub struct Constellation<Message, LTF, STF> {
     canvas_chan: IpcSender<CanvasMsg>,
 
     /// Application which uses Servo as a GUI library.
-    gui_application: Option<Box<GuiApplication>>,
+    gui_application: Option<Box<dyn Any + Send>>,
 }
 
 /// State needed to construct a constellation.
@@ -384,7 +384,7 @@ pub struct InitialConstellationState {
     pub supports_clipboard: bool,
 
     /// Application which uses Servo as a GUI library.
-    pub gui_application: Option<Box<GuiApplication>>,
+    pub gui_application: Option<Box<dyn Any + Send>>,
 }
 
 /// Data needed for webdriver
@@ -705,7 +705,7 @@ where
         load_data: LoadData,
         sandbox: IFrameSandboxState,
         is_private: bool,
-        gui_application: Option<Box<GuiApplication>>,
+        gui_application: Option<Box<dyn Any + Send>>,
     ) {
         if self.shutting_down {
             return;

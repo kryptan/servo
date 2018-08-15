@@ -559,10 +559,10 @@ class CommandBase(object):
         if hosts_file_path:
             env['HOST_FILE'] = hosts_file_path
 
-        if not test_unit:
+     #   if not test_unit:
             # This wrapper script is in bash and doesn't work on Windows
             # where we want to run doctests as part of `./mach test-unit`
-            env['RUSTDOC'] = path.join(self.context.topdir, 'etc', 'rustdoc-with-private')
+     #       env['RUSTDOC'] = path.join(self.context.topdir, 'etc', 'rustdoc-with-private')
 
         if self.config["build"]["rustflags"]:
             env['RUSTFLAGS'] = env.get('RUSTFLAGS', "") + " " + self.config["build"]["rustflags"]

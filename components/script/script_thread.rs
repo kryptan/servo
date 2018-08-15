@@ -45,6 +45,7 @@ use dom::customelementregistry::{CallbackReaction, CustomElementDefinition, Cust
 use dom::document::{Document, DocumentSource, FocusType, HasBrowsingContext, IsHTMLDocument, TouchEventResult};
 use dom::element::Element;
 use dom::event::{Event, EventBubbles, EventCancelable};
+use dom::eventtarget::EventTarget;
 use dom::globalscope::GlobalScope;
 use dom::htmlanchorelement::HTMLAnchorElement;
 use dom::htmliframeelement::{HTMLIFrameElement, NavigationType};
@@ -97,13 +98,13 @@ use script_traits::{ProgressiveWebMetricType, Painter, ScriptMsg, ScriptThreadFa
 use script_traits::{ScriptToConstellationChan, TimerEvent, TimerSchedulerMsg};
 use script_traits::{TimerSource, TouchEventType, TouchId, UntrustedNodeAddress};
 use script_traits::{UpdatePipelineIdReason, WindowSizeData, WindowSizeType};
-use script_traits::GuiApplication;
 use script_traits::CompositorEvent::{KeyEvent, MouseButtonEvent, MouseMoveEvent, ResizeEvent, TouchEvent};
 use script_traits::webdriver_msg::WebDriverScriptCommand;
 use serviceworkerjob::{Job, JobQueue};
 use servo_atoms::Atom;
 use servo_config::opts;
 use servo_url::{ImmutableOrigin, MutableOrigin, ServoUrl};
+use std::any::Any;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::{hash_map, HashMap, HashSet};
@@ -131,6 +132,7 @@ use webdriver_handlers;
 use webrender_api::DocumentId;
 use webvr_traits::{WebVREvent, WebVRMsg};
 use net_traits::response::HttpsState;
+use gui::GuiApplication;
 
 pub type ImageCacheMsg = (PipelineId, PendingImageResponse);
 
@@ -526,7 +528,7 @@ pub struct ScriptThread {
     webrender_document: DocumentId,
 
     /// Application which uses Servo as a GUI library.
-    gui_application: RefCell<Box<GuiApplication>>,
+    gui_application: RefCell<Box<dyn GuiApplication>>,
 }
 
 /// In the event of thread panic, all data on the stack runs its destructor. However, there
@@ -863,6 +865,9 @@ impl ScriptThread {
 
         let (image_cache_channel, image_cache_port) = channel();
 
+        let gui_application: Box<dyn Any + Send> = state.gui_application.unwrap();
+        let gui_application: Box<dyn GuiApplication> = *gui_application.downcast::<Box<dyn GuiApplication>>().unwrap();
+
         ScriptThread {
             documents: DomRefCell::new(Documents::new()),
             window_proxies: DomRefCell::new(HashMap::new()),
@@ -931,7 +936,7 @@ impl ScriptThread {
 
             webrender_document: state.webrender_document,
 
-            gui_application: RefCell::new(state.gui_application.unwrap()),
+            gui_application: RefCell::new(gui_application),
         }
     }
 
@@ -2586,6 +2591,13 @@ impl ScriptThread {
             self.script_sender.send((id, ScriptMsg::InitiateNavigateRequest(req_init, cancel_chan))).unwrap();
         }
         self.incomplete_loads.borrow_mut().push(incomplete);
+    }
+
+    pub fn call_rust_event_handler(name: &str, event_target: &EventTarget, event: &Event) {
+        SCRIPT_THREAD_ROOT.with(|root| {
+            let script_thread = unsafe { &*root.get().unwrap() };
+            script_thread.gui_application.borrow_mut().handle_event(name, event_target, event);
+        })
     }
 
     pub fn load_app_resource_static(url: &ServoUrl) -> Vec<FetchResponseMsg> {

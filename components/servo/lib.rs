@@ -97,6 +97,7 @@ use profile_traits::time;
 use script_traits::{ConstellationMsg, SWManagerSenders, ScriptToConstellationChan};
 use servo_config::opts;
 use servo_config::prefs::PREFS;
+use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::max;
 use std::path::PathBuf;
@@ -109,7 +110,7 @@ pub use gleam::gl;
 pub use servo_config as config;
 pub use servo_url as url;
 pub use msg::constellation_msg::{KeyState, TopLevelBrowsingContextId as BrowserId};
-pub use script_traits::{GuiApplication, GuiApplicationResponse};
+pub use script::gui::{GuiApplication, GuiApplicationResponse};
 
 /// The in-process interface to Servo.
 ///
@@ -518,6 +519,12 @@ fn create_constellation(user_agent: Cow<'static, str>,
 
         webgl_threads
     });
+
+    let gui_application: Option<Box<dyn Any + Send>> = gui_application.map(
+        |gui_application| {
+            Box::new(gui_application) as Box<dyn Any + Send>
+        }
+    );
 
     let initial_state = InitialConstellationState {
         compositor_proxy,

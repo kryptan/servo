@@ -7,7 +7,6 @@ extern crate euclid;
 extern crate gleam;
 extern crate glutin;
 #[macro_use] extern crate lazy_static;
-#[cfg(any(target_os = "linux", target_os = "macos"))] extern crate osmesa_sys;
 extern crate servo;
 #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 extern crate tinyfiledialogs;
@@ -26,15 +25,8 @@ use servo::servo_url::ServoUrl;
 pub use servo::{GuiApplication, GuiApplicationResponse};
 pub use winit::WindowBuilder;
 
-pub mod platform {
-    #[cfg(target_os = "macos")]
-    pub use platform::macos::deinit;
-
-    #[cfg(target_os = "macos")]
-    pub mod macos;
-
-    #[cfg(not(target_os = "macos"))]
-    pub fn deinit() {}
+pub mod dom {
+    pub use servo::script::gui::dom::*;
 }
 
 pub fn run(title: &str, app: Box<GuiApplication>) {
@@ -85,6 +77,4 @@ pub fn run_with_window_builder(window_builder: winit::WindowBuilder, vsync: bool
     });
 
     servo.deinit();
-
-    platform::deinit()
 }
